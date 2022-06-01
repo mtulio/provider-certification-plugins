@@ -149,7 +149,7 @@ start_status_collector() {
     os_log_info_local "Starting sonobuoy status collector..."
     while true;
     do
-        ${SONOBUOY_BIN} status --json 2>/dev/null > "${STATUS_FILE}"
+        ${SONOBUOY_BIN} status -n "${ENV_POD_NAMESPACE:-sonobuoy}" --json 2>/dev/null > "${STATUS_FILE}"
         sleep "${STATUS_UPDATE_INTERVAL_SEC}"
     done
 }

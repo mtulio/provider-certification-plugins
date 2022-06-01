@@ -18,6 +18,7 @@ if [[ ${#PLUGIN_BLOCKED_BY[@]} -ge 1 ]]; then
     for pod_label in "${PLUGIN_BLOCKED_BY[@]}"; do
         os_log_info_local "Waiting for pod running with label: ${pod_label}"
         kubectl wait \
+            --namespace "${ENV_POD_NAMESPACE:-sonobuoy}" \
             --timeout=10m \
             --for=condition=ready pod \
             -l sonobuoy-plugin="${pod_label}"

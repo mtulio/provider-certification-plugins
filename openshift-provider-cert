@@ -23,6 +23,7 @@ declare -gxr WORKDIR="./.openshift-cert"
 declare -gxr STAT_FILE="${WORKDIR}/sonobuoy-status.json"
 declare -gxr RESULTS_LATEST="${WORKDIR}/results-latest.txt"
 declare -gxr STATUS_INTERVAL_SEC=10
+declare -gx DEFAULT_NAMESPACE="openshift-provider-certification"
 
 util_path_sonobuoy="$(command -v sonobuoy || true)"
 util_path_oc="$(command -v oc || true)"
@@ -134,14 +135,14 @@ check_dependencies() {
 wait_for_required_resources() {
     local aggregator_labels
     aggregator_labels="component=sonobuoy,sonobuoy-component=aggregator"
-    if [[ -n "$(${CMD_OC} get pod -n sonobuoy \
+    if [[ -n "$(${CMD_OC} get pod -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}" \
                 -l ${aggregator_labels} \
                 -o jsonpath='{.items[*].metadata.name}' \
                 2>/dev/null || true)" ]]; then
         return
     fi
     log_info "The aggregator is not running ['pod/sonobuoy']. Waiting for resource be created..."
-    ${CMD_OC} wait -n sonobuoy \
+    ${CMD_OC} wait -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}" \
         --timeout=10m \
         --for=condition=ready \
         pod -l ${aggregator_labels} >/dev/null
@@ -172,7 +173,7 @@ wait_for_required_state() {
 # cmd: status
 #
 check_sonobuoy_ns_exists() {
-    if [[ -z "$(${CMD_OC} get projects |grep ^sonobuoy || true)" ]]; then
+    if [[ -z "$(${CMD_OC} get projects |grep ^"${NAMESPACE:-${DEFAULT_NAMESPACE}}" || true)" ]]; then
         echo -ne 1
     fi
     echo -ne 0
@@ -180,7 +181,9 @@ check_sonobuoy_ns_exists() {
 
 run_status_updater() {
     while true; do
-        ${CMD_SONOBUOY} status --json > "${STAT_FILE}" 2>/dev/null || true
+        ${CMD_SONOBUOY} status --json \
+            -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}" \
+            > "${STAT_FILE}" 2>/dev/null || true
         test -s "${STAT_FILE}" && return
         sleep "${STATUS_INTERVAL_SEC}"
     done
@@ -308,7 +311,7 @@ cmd_results() {
         exit 1
     fi
     log_info "#> Reading results from file ${file_path}"
-    ${CMD_SONOBUOY} results "${file_path}"
+    ${CMD_SONOBUOY} results -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}" "${file_path}"
 }
 
 
@@ -328,7 +331,7 @@ check_sonobuoy_not_present() {
 }
 
 delete_sonobuoy_env() {
-    ${CMD_SONOBUOY} delete --wait
+    ${CMD_SONOBUOY} delete -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}" --wait
 }
 
 delete_tests_namespaces() {
@@ -391,6 +394,7 @@ set_scc() {
 run_env_default() {
     local cmd
     cmd="${CMD_SONOBUOY} run \
+        --namespace ${NAMESPACE:-${DEFAULT_NAMESPACE}} \
         --dns-namespace=openshift-dns \
         --dns-pod-labels=dns.operator.openshift.io/daemonset-dns=default \
         --timeout=${PLUGIN_TIMEOUT} \
@@ -415,6 +419,7 @@ run_env_dedicated() {
 
     # Mandatory to skip preflight to avoid NS checking
     cmd="${CMD_SONOBUOY} run \
+        --namespace ${NAMESPACE:-${DEFAULT_NAMESPACE}} \
         --dns-namespace=openshift-dns \
         --dns-pod-labels=dns.operator.openshift.io/daemonset-dns=default \
         --timeout=${PLUGIN_TIMEOUT} \

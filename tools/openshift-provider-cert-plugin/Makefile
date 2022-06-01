@@ -6,7 +6,7 @@ generate-openshift-tests:
 	hack/generate-tests-tiers.sh
 .PHONY: generate-openshift-tests
 
-build: generate-openshift-tests
+build:
 	hack/build-image.sh
 .PHONY: build
 
