@@ -102,31 +102,82 @@ openshift_login() {
 }
 
 #
+# JUnit utils
+#
+
+# Create fake JUnit file with custom error
+create_junit_with_msg() {
+    local msg_type
+    local msg
+    local failures_count
+    local junit_file
+
+    msg_type="$1"; shift
+    msg="$1"; shift
+    failures_count=0
+
+    if [[ "${msg_type}" == "failed" ]]; then
+        failures_count=1
+    fi
+    junit_file="${RESULTS_DIR}/junit_${msg_type}_e2e_$(date +%Y%m%d-%H%M%S).xml"
+
+    os_log_info_local "Creating ${msg_type} JUnit result file [${junit_file}]"
+    cat << EOF > "${junit_file}"
+<testsuite name="openshift-tests" tests="1" skipped="0" failures="${failures_count}" time="1.0">
+ <property name="TestVersion" value="v4.1.0"></property>
+ <testcase
+    name="${msg}"
+    time="1.0">
+</testcase>
+</testsuite>
+EOF
+}
+export -f create_junit_with_msg
+
+#
 # Utilities extractor
 #
 
 # Extract utilities from internal image-registry
 start_utils_extractor() {
-    os_log_info_local "[utils_extractor] Starting..."
+    os_log_info_local "[utils_extractor] Starting"
     local util_otests="./openshift-tests"
 
-    os_log_info_local "[utils_extractor] Login to OpenShift Registry..."
+    os_log_info_local "[utils_extractor] Login to OpenShift Registry"
     oc registry login
 
-    os_log_info_local "[utils_extractor] Extracting openshift-tests utility..."
+    os_log_info_local "[utils_extractor] Extracting openshift-tests utility"
     oc image extract \
         image-registry.openshift-image-registry.svc:5000/openshift/tests:latest \
         --insecure=true \
         --file="${UTIL_OTESTS_BIN}"
 
-    os_log_info_local "[utils_extractor] check if it was downloaded..."
-    test -f ${util_otests} && chmod u+x ${util_otests}
+    os_log_info_local "[utils_extractor] check if it was downloaded"
+    if [[ ! -f ${util_otests} ]]; then
+        create_junit_with_msg "fail" "[fail][preflight] unable to extract openshift-tests utility. Check if image-registry is present."
+        exit 1
+    fi
+    chmod u+x ${util_otests}
 
-    os_log_info_local "[utils_extractor] move to ${UTIL_OTESTS_BIN}..."
+    os_log_info_local "[utils_extractor] move to ${UTIL_OTESTS_BIN}"
     mv ${util_otests} "${UTIL_OTESTS_BIN}"
 
-    os_log_info_local "[utils_extractor] unlock extractor..."
-    test -x "${UTIL_OTESTS_BIN}" && touch "${UTIL_OTESTS_READY}"
+    os_log_info_local "[utils_extractor] set exec permissions for ${UTIL_OTESTS_BIN}"
+    if [[ ! -x ${UTIL_OTESTS_BIN} ]]; then
+        create_junit_with_msg "fail" "[fail][preflight] unable to make ${UTIL_OTESTS_BIN} executable."
+        exit 1
+    fi
+
+    os_log_info_local "[utils_extractor] testing openshift-tests"
+    tt_tests=$(${UTIL_OTESTS_BIN} run all --dry-run | wc -l)
+    if [[ ${tt_tests} -le 0 ]]; then
+        create_junit_with_msg "fail" "[fail][preflight] failed to get tests from ${UTIL_OTESTS_BIN} utility. Found [${tt_tests}] tests."
+        exit 1
+    fi
+    os_log_info_local "[utils_extractor] Success! openshift-tests has [${tt_tests}] tests available."
+
+    os_log_info_local "[utils_extractor] unlocking extractor"
+    touch "${UTIL_OTESTS_READY}"
 }
 
 wait_utils_extractor() {
