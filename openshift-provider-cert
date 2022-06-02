@@ -311,7 +311,7 @@ cmd_results() {
         exit 1
     fi
     log_info "#> Reading results from file ${file_path}"
-    ${CMD_SONOBUOY} results -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}" "${file_path}"
+    ${CMD_SONOBUOY} results "${file_path}"
 }
 
 
@@ -324,8 +324,8 @@ cmd_retrieve() {
 #
 check_sonobuoy_not_present() {
     # Check if there's sonobuoy environment: should fail
-    if [[ -z "$(${CMD_OC} get projects |grep ^sonobuoy || true)" ]]; then
-        echo "The namespace [sonobuoy] is not present on cluster. Exiting."
+    if [[ -z "$(${CMD_OC} get projects |grep ^"${NAMESPACE:-${DEFAULT_NAMESPACE}}" || true)" ]]; then
+        echo "The namespace [${NAMESPACE:-${DEFAULT_NAMESPACE}}] is not present on cluster. Exiting."
         exit 1
     fi
 }
@@ -360,7 +360,7 @@ delete_sonobuoy_status() {
 cmd_destroy() {
     log_info "Starting the destroy flow..."
 
-    if [[ -n "$(oc get projects |grep ^sonobuoy || true)" ]]
+    if [[ -n "$(oc get projects |grep ^"${NAMESPACE:-${DEFAULT_NAMESPACE}}" || true)" ]]
     then
         delete_sonobuoy_env
         delete_sonobuoy_status
@@ -409,13 +409,23 @@ run_env_default() {
 #
 # TODO(fix) Issue: Sonobuoy does not allow to set the tolerations.
 # TODO(fix) Issue: Sonobuoy node-selector does not allow empty label/value,
-# like node-role/tests=''. So need to create a custom label `openshift-tests=true`
-# to filter the node.
+# like node-role.kubernetes.io/tests=''. Maybe need to create a custom
+# label `openshift-tests=true` on affinity rules used by plugin manifests.
 run_env_dedicated() {
     local cmd
 
     # Mandatory NS annotations to NS to spin all the pods on dedicated node
-    ${CMD_OC} create -f tools/plugins/namespace.yaml
+    cat <<EOF | envsubst | oc create -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    kubernetes.io/metadata.name: ${NAMESPACE:-${DEFAULT_NAMESPACE}}
+  annotations:
+    scheduler.alpha.kubernetes.io/defaultTolerations: '[{"operator": "Exists", "effect":
+      "NoSchedule", "key": "node-role.kubernetes.io/tests", "value": ""}]'
+  name: ${NAMESPACE:-${DEFAULT_NAMESPACE}}
+EOF
 
     # Mandatory to skip preflight to avoid NS checking
     cmd="${CMD_SONOBUOY} run \
@@ -500,7 +510,7 @@ collect_results() {
     retries=0
     retry_limit=10
     while true; do
-        result_file=$(sonobuoy retrieve)
+        result_file=$(${CMD_SONOBUOY} retrieve -n "${NAMESPACE:-${DEFAULT_NAMESPACE}}")
         RC=$?
         if [[ ${RC} -eq 0 ]]; then
             break
