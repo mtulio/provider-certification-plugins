@@ -173,7 +173,7 @@ wait_for_required_state() {
 # cmd: status
 #
 check_sonobuoy_ns_exists() {
-    if [[ -z "$(${CMD_OC} get projects |grep ^"${NAMESPACE:-${DEFAULT_NAMESPACE}}" || true)" ]]; then
+    if [[ -z "$(${CMD_OC} get projects |grep -P"^${NAMESPACE:-${DEFAULT_NAMESPACE}}$" || true)" ]]; then
         echo -ne 1
     fi
     echo -ne 0
@@ -400,6 +400,8 @@ run_env_default() {
         --timeout=${PLUGIN_TIMEOUT} \
         --plugin=tools/plugins/openshift-kube-conformance_env-shared.yaml \
         --plugin=tools/plugins/openshift-conformance-validated_env-shared.yaml \
+        --plugin=tools/plugins/openshift-csi-certification.yaml \
+        --plugin-env openshift-csi-certification.STORAGE_CLASS=${STORAGE_CLASS:-NA} \
         ${FLAG_SONOBUOY_IMAGE:-}"
     ${cmd}
 }
@@ -436,6 +438,8 @@ EOF
         --skip-preflight \
         --plugin=tools/plugins/openshift-kube-conformance_env-dedicated.yaml \
         --plugin=tools/plugins/openshift-conformance-validated_env-dedicated.yaml \
+        --plugin=tools/plugins/openshift-csi-certification.yaml \
+        --plugin-env openshift-csi-certification.STORAGE_CLASS=${STORAGE_CLASS:-NA} \
         ${FLAG_SONOBUOY_IMAGE:-}"
     ${cmd}
 }

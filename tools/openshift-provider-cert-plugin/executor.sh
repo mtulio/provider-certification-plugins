@@ -24,12 +24,33 @@ os_log_info "[executor] Executor started. Choosing execution type based on envir
 
 if [[ -n "${CERT_TEST_SUITE}" ]]; then
     os_log_info "Running openshift-tests suite [${CERT_TEST_SUITE}] Provider Conformance..."
-    openshift-tests run \
-        --junit-dir "${RESULTS_DIR}" \
-        "${CERT_TEST_SUITE}" \
-        | tee -a "${RESULTS_PIPE}" || true
+    #openshift-tests run \
+    #    --junit-dir "${RESULTS_DIR}" \
+    #    "${CERT_TEST_SUITE}" \
+    #    | tee -a "${RESULTS_PIPE}" || true
 
     os_log_info "openshift-tests finished[$?]"
+
+elif [[ "${CERT_LEVEL}" == "csi" ]]; then
+    suite="openshift/csi"
+    os_log_info "Starting setup CSI certification..."
+
+    os_log_info "Getting CSI driver configuration from ConfigMap"
+    os_log_info " Namespace[openshift-provider-certification-csi] ConfigMap[driver-test-spec] Key=[manifest.yaml]"
+    oc extract configmap/driver-test-spec \
+        -n openshift-provider-certification-csi \
+        --keys=manifest.yaml
+
+    os_log_info "Getting StorageClass [${STORAGE_CLASS:-}] manifest"
+    oc get "storageclass/${STORAGE_CLASS:-}" -o yaml > cert-csi-storageclass.yaml
+
+    os_log_info "Running openshift-tests suite [${suite}] for CSI Certification..."
+    TEST_CSI_DRIVER_FILES=${PWD}/manifest.yaml openshift-tests run \
+        --junit-dir "${RESULTS_DIR}" \
+        "${suite}" \
+        | tee -a "${RESULTS_PIPE}" || true
+
+    os_log_info "openshift-tests finished for csi cert[$?]"
 
 # To run custom tests, set the environment CERT_LEVEL on plugin definition.
 # To generate the test file, use the script hack/generate-tests-tiers.sh

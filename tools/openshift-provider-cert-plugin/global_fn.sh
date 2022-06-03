@@ -58,6 +58,13 @@ init_config() {
         CERT_TEST_SUITE=""
         PLUGIN_BLOCKED_BY+=("openshift-provider-cert-level2")
 
+    elif [[ "${CERT_LEVEL:-}" == "csi" ]]
+    then
+        PLUGIN_NAME="openshift-certification-csi"
+        CERT_TEST_FILE=""
+        CERT_TEST_SUITE=""
+        PLUGIN_BLOCKED_BY+=("openshift-conformance-validated")
+
     else
         os_log_info "[init_config] Unknow value for CERT_LEVEL=[${CERT_LEVEL:-}]"
         exit 1

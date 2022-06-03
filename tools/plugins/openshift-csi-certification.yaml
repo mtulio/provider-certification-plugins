@@ -1,0 +1,60 @@
+podSpec:
+  restartPolicy: Never
+  serviceAccountName: sonobuoy-serviceaccount
+  containers:
+    - name: report-progress
+      image: quay.io/mrbraga/openshift-tests-provider-cert:devel
+      imagePullPolicy: Always
+      priorityClassName: system-node-critical
+      command: ["./report-progress.sh"]
+      volumeMounts:
+      - mountPath: /tmp/sonobuoy/results
+        name: results
+      env:
+        - name: CERT_LEVEL
+          value: "csi"
+        - name: ENV_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: ENV_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ENV_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+sonobuoy-config:
+  driver: Job
+  plugin-name: openshift-csi-certification
+  result-format: junit
+  description: The end-to-end tests maintained by Kubernetes to certify the platform.
+  source-url: https://github.com/openshift/provider-certification-tool/blob/mvp/tools/plugins/openshift-kube-conformance.yaml
+  skipCleanup: true
+spec:
+  name: plugin
+  image: quay.io/mrbraga/openshift-tests-provider-cert:devel
+  imagePullPolicy: Always
+  priorityClassName: system-node-critical
+  volumeMounts:
+  - mountPath: /tmp/sonobuoy/results
+    name: results
+  env:
+    - name: CERT_LEVEL
+      value: csi
+    - name: CSI_TEST_ENV_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: ENV_POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: ENV_POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+  resources:
+    requests:
+      memory: "4096Mi"
