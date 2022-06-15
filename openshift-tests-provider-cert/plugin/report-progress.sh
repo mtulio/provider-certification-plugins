@@ -78,7 +78,7 @@ watch_plugin_done() {
 }
 
 # watch_dependency_done watches aggregator API (status) to
-# unblock the execution when dependencies was finished the execution.
+# unblock the execution when dependencies were finished the execution.
 watch_dependency_done() {
     os_log_info_local "[watch_dependency] Starting dependency check..."
     for plugin_name in "${PLUGIN_BLOCKED_BY[@]}"; do
