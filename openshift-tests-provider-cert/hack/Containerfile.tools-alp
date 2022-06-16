@@ -1,4 +1,4 @@
-# Code generated for package assets by build-image.sh. DO NOT EDIT.
+# Code generated for package assets by hack/build-image.sh. DO NOT EDIT.
 # sources:
 # hack/Containerfile.alp
 # hack/Containerfile.tools-alp
@@ -6,7 +6,9 @@
 # Sonobuoy
 FROM ${CONTAINER_SONOBUOY_MIRROR} as sonobuoy
 
-# Base image
+#
+# Base image. Builder for Tool image
+#
 FROM ${CONTAINER_BASE} as base
 
 # gcompat: allow to run glibc programs (oc and jq)
@@ -19,10 +21,12 @@ WORKDIR /clients
 
 ADD https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/${VERSION_OC}/openshift-client-linux.tar.gz ./
 ADD https://stedolan.github.io/jq/download/linux64/jq ./
+ADD https://github.com/vmware-tanzu/carvel-ytt/releases/download/v0.40.1/ytt-linux-amd64 ./ytt
+
 RUN apk add --no-cache --update tar binutils \
   && tar xvfz openshift-client-linux.tar.gz \
   && rm -f openshift-client-linux.tar.gz kubectl README.md \
-  && chmod +x jq oc \
+  && chmod +x jq oc ytt \
   && strip oc
 
 # Tool image
@@ -34,6 +38,8 @@ WORKDIR /tools
 COPY --from=sonobuoy /sonobuoy /usr/bin/
 COPY --from=clients /clients/oc /usr/bin/
 COPY --from=clients /clients/jq /usr/bin/
+COPY --from=clients /clients/ytt /usr/bin/
+
 RUN ln -svf /usr/bin/oc /usr/bin/kubectl
 
 RUN rm -rf /var/cache/apk/*

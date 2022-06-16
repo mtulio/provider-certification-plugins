@@ -1,7 +1,22 @@
-# Code generated for package assets by build-image.sh. DO NOT EDIT.
+# Code generated for package assets by hack/build-image.sh. DO NOT EDIT.
 # sources:
 # hack/Containerfile.alp
 # hack/Containerfile.tools-alp
+
+#
+# Post-processor builder
+#
+FROM golang:1.17-buster as pp-builder
+WORKDIR /src
+
+COPY ./post-processor/go.sum /src/go.sum
+COPY ./post-processor/go.mod /src/go.mod
+RUN go mod download
+
+COPY ./post-processor/cmd /src/cmd
+COPY ./post-processor/main.go /src/main.go
+RUN go build -ldflags="-s -w" -o sonobuoy-processor
+
 
 # Plugin container image
 FROM ${CONTAINER_TOOLS}
@@ -9,6 +24,7 @@ LABEL io.k8s.display-name="OpenShift Tests for Provider Certification Plugin" \
       io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
       io.openshift.tags="openshift,tests,e2e,partner,certification,plugin"
 WORKDIR /plugin
+COPY --from=pp-builder /src/sonobuoy-processor /usr/bin/
 
 COPY ./tests ./tests
 COPY ./plugin/*.sh ./

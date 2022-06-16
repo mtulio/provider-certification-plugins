@@ -1,0 +1,109 @@
+config-map:
+  ytt-transform.yaml: |
+    #@ load("@ytt:overlay", "overlay")
+    #@overlay/match by=overlay.all
+    #@overlay/match-child-defaults expects="0+"
+    ---
+    items:
+      #@overlay/match by=overlay.all
+      - items:
+        #@overlay/match by=overlay.map_key("status")
+        #@overlay/remove via=lambda left, right: right
+        - status: skipped
+podSpec:
+  restartPolicy: Never
+  serviceAccountName: sonobuoy-serviceaccount
+  volumes:
+    - name: shared
+      emptyDir: {}
+  containers:
+    - name: postprocessing
+      image: quay.io/ocp-cert/openshift-tests-provider-cert:dev20220616030250
+      command: ["/usr/bin/sonobuoy-processor"]
+      volumeMounts:
+      - mountPath: /tmp/sonobuoy/results
+        name: results
+    - name: report-progress
+      image: quay.io/mrbraga/openshift-tests-provider-cert:devel
+      imagePullPolicy: Always
+      priorityClassName: system-node-critical
+      command: ["./report-progress.sh"]
+      volumeMounts:
+      - mountPath: /tmp/sonobuoy/results
+        name: results
+      - mountPath: /tmp/shared
+        name: shared
+      env:
+        - name: CERT_LEVEL
+          value: "1"
+        - name: ENV_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: ENV_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ENV_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+sonobuoy-config:
+  driver: Job
+  plugin-name: openshift-tests-plugin-sample
+  result-format: junit
+  description: The Sonobuoy plugin for openshift-tests utility
+  source-url: https://github.com/redhat-openshift-ecosystem/provider-certification-plugins/
+  skipCleanup: true
+spec:
+  name: plugin
+  image: quay.io/mrbraga/openshift-tests-provider-cert:devel
+  imagePullPolicy: Always
+  priorityClassName: system-node-critical
+  volumeMounts:
+  - mountPath: /tmp/sonobuoy/results
+    name: results
+  - mountPath: /tmp/shared
+    name: shared
+  env:
+    # ToDo: native report is not working, using custom container
+    #- name: E2E_EXTRA_ARGS
+    #  value: --progress-report-url=http://localhost:8099/progress
+
+    # Example: select suite to run
+    #- name: E2E_SUITE
+    #  value: kubernetes/conformance
+
+    # Example: keep the focus on Conformance tests only.
+    #- name: E2E_FOCUS
+    #  value: \[Conformance\]
+
+    # Example:Run custom test file (should be included on image)
+    #- name: CUSTOM_TEST_FILE
+    #  value: ./tests/level3.txt
+
+    # Example:Use internal parser/filter to run jobs
+    #- name: CUSTOM_TEST_FILTER_SIG
+    #  value: sig-storage
+
+    # Example: Filter tests from all suite by string pattern
+    #- name: CUSTOM_TEST_FILTER_STR
+    #  value: \[sig-cli\]
+
+    - name: CERT_LEVEL
+      value: "1"
+    - name: ENV_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: ENV_POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: ENV_POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+  resources:
+    requests:
+      memory: "4096Mi"
