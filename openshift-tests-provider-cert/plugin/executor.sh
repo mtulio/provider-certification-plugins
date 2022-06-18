@@ -100,3 +100,4 @@ else
 fi
 
 os_log_info "Plugin executor finished. Result[$?]";
+set +x

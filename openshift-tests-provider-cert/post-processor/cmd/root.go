@@ -40,6 +40,37 @@ const (
 	donefile = "done"
 )
 
+func GetDoneFilePath() string {
+	return filepath.Join(ph.GetResultsDir(), donefile)
+}
+
+func DoneFileExists() bool {
+	if _, err := os.Stat(GetDoneFilePath()); err == nil {
+		return true
+	}
+	return false
+}
+
+func RemoveDoneFile() error {
+	logrus.Trace(">><< Removing DoneFile")
+	if err := os.Remove(GetDoneFilePath()); err != nil {
+		logrus.Errorf("Failed to remove donefile; postprocessing may end in race: %v", err)
+	}
+	return nil
+}
+
+func CreateDoneFileFake() error {
+	logrus.Trace(">><< Creating DoneFile")
+	fd, err := os.Create(GetDoneFilePath())
+	if err != nil {
+		msg := fmt.Sprintf("Failed to create donefile; postprocessing may end in race: %v", err)
+		// logrus.Errorf(msg)
+		return fmt.Errorf(msg)
+	}
+	defer fd.Close()
+	return nil
+}
+
 // rootCmd represents the base command when called without any subcommands
 func getRootCmd() *cobra.Command {
 	return &cobra.Command{
@@ -49,6 +80,32 @@ func getRootCmd() *cobra.Command {
 			return waitForDone()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Creating a ticker to tell the worker to wait the processing, regardless the total time.
+			// Default is 5s and is impacting in Data race
+			logrus.Trace(">><< Starting Done Control file watcher")
+			ticker := time.NewTicker(1 * time.Second)
+			done := make(chan bool)
+			go func() {
+				for {
+					select {
+					case <-done:
+						return
+					case t := <-ticker.C:
+						fmt.Println("Checking", t)
+						var err error
+						if DoneFileExists() {
+							err = RemoveDoneFile()
+						} else {
+							err = CreateDoneFileFake()
+						}
+						if err != nil {
+							logrus.Errorf("%s", err)
+						}
+					}
+				}
+			}()
+
 			logrus.Trace(">><< A")
 			dir := os.Getenv("SONOBUOY_RESULTS_DIR")
 
@@ -91,16 +148,26 @@ func getRootCmd() *cobra.Command {
 			output.Items = append(output.Items, items...)
 			output.Status = results.AggregateStatus(output.Items...)
 			logrus.Trace(">><< 1")
-			logrus.Trace(output)
+			//logrus.Trace(output)
 			SaveYAML(output)
 			logrus.Trace(">><< 2")
-
+			logrus.Trace(">><< 2A copy")
+			// cp := exec.Command("cp", "-rf",
+			// 	fmt.Sprintf("%v/sonobuoy_results.yaml", ph.GetResultsDir()),
+			// 	fmt.Sprintf("%v/sonobuoy_results2.yaml", ph.GetResultsDir()))
+			// _, err = cp.CombinedOutput()
+			// if err != nil {
+			// 	logrus.Trace(">><< 2A.err")
+			// 	logrus.Error(err)
+			// 	return err
+			// }
 			// Now shell out to ytt.
 			c := exec.Command("/usr/bin/ytt",
 				"--dangerous-allow-all-symlink-destinations",
 				fmt.Sprintf("-f=%v/sonobuoy_results.yaml", ph.GetResultsDir()),
-				fmt.Sprintf("-f=%v/ytt-transform.yaml", os.Getenv("SONOBUOY_CONFIG_DIR")),
+				fmt.Sprintf("-f=%v/ytt-transform-commentFailed.yaml", os.Getenv("SONOBUOY_CONFIG_DIR")),
 				fmt.Sprintf("--output-files=%v", ph.GetResultsDir()))
+
 			logrus.Trace(">><< 3")
 			b, err := c.CombinedOutput()
 			logrus.Trace(">><< 4")
@@ -121,22 +188,22 @@ func getRootCmd() *cobra.Command {
 			// 	logrus.Trace(">><< 6.err1")
 			// 	logrus.Error(err)
 			// }
-			err = os.Chmod(fmt.Sprintf("%v/sonobuoy_results.yaml", ph.GetResultsDir()), 0644)
-			logrus.Trace(">><< 6B")
-			if err != nil {
-				//log.Fatal(err)
-				logrus.Trace(">><< 6.err2")
-				logrus.Error(err)
-			}
+			// err = os.Chmod(fmt.Sprintf("%v/sonobuoy_results.yaml", ph.GetResultsDir()), 0644)
+			// logrus.Trace(">><< 6B")
+			// if err != nil {
+			// 	//log.Fatal(err)
+			// 	logrus.Trace(">><< 6.err2")
+			// 	logrus.Error(err)
+			// }
 			// logrus.Trace(">><< 6C")
-			// chmod := exec.Command("chmod", "-R", "0777", fmt.Sprintf("%v/transformed", ph.GetResultsDir()))
+			// chmod := exec.Command("chmod", "-R", "0755", ph.GetResultsDir())
 			// _, err = chmod.CombinedOutput()
 			// if err != nil {
 			// 	logrus.Trace(">><< 6C.err")
 			// 	logrus.Error(err)
 			// 	return err
 			// }
-			// ls := exec.Command("ls", "-R", fmt.Sprintf("%v/transformed", ph.GetResultsDir()))
+			// ls := exec.Command("ls", "-R", fmt.Sprintf("%v", ph.GetResultsDir()))
 			// lsO, err := ls.CombinedOutput()
 			// if err != nil {
 			// 	logrus.Trace(">><< 6C.err")
@@ -145,8 +212,14 @@ func getRootCmd() *cobra.Command {
 			// 	return err
 			// }
 			// logrus.Trace(string(lsO))
-			logrus.Trace("Done with processing >><<")
 
+			logrus.Trace(">><< 7 > Stopping the Ticker")
+			ticker.Stop()
+			done <- true
+			logrus.Trace("Done with processing >><<")
+			if DoneFileExists() {
+				err = RemoveDoneFile()
+			}
 			return nil
 		},
 	}

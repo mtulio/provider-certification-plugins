@@ -17,7 +17,6 @@ COPY ./post-processor/cmd /src/cmd
 COPY ./post-processor/main.go /src/main.go
 RUN go build -ldflags="-s -w" -o sonobuoy-processor
 
-
 # Plugin container image
 FROM ${CONTAINER_TOOLS}
 LABEL io.k8s.display-name="OpenShift Tests for Provider Certification Plugin" \
