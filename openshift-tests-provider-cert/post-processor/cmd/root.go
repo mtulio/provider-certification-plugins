@@ -71,6 +71,19 @@ func CreateDoneFileFake() error {
 	return nil
 }
 
+// createDebugFile creates one empty file on the shared storage to make sure it will be collected
+// by worker on the results archive/tarball file.
+func createDebugFile(pf string, idx uint64) {
+	filename := fmt.Sprintf("%s/debugFile_%s_%d", ph.GetResultsDir(), pf, idx)
+	logrus.Trace(fmt.Sprintf(">><< Creating DebugFile: %s", filename))
+	fd, err := os.Create(filename)
+	if err != nil {
+		logrus.Errorf(fmt.Sprintf("Failed to create debugFile. %v", err))
+		return
+	}
+	defer fd.Close()
+}
+
 // rootCmd represents the base command when called without any subcommands
 func getRootCmd() *cobra.Command {
 	return &cobra.Command{
@@ -86,7 +99,10 @@ func getRootCmd() *cobra.Command {
 			logrus.Trace(">><< Starting Done Control file watcher")
 			ticker := time.NewTicker(1 * time.Second)
 			done := make(chan bool)
+			var idx uint64 = 0
+			createDebugFile("0-pre", idx)
 			go func() {
+				var idxt uint64 = 0
 				for {
 					select {
 					case <-done:
@@ -94,6 +110,8 @@ func getRootCmd() *cobra.Command {
 					case t := <-ticker.C:
 						fmt.Println("Checking", t)
 						var err error
+						idxt += 1
+						createDebugFile("1-tk", idxt)
 						if DoneFileExists() {
 							err = RemoveDoneFile()
 						} else {
@@ -114,6 +132,17 @@ func getRootCmd() *cobra.Command {
 			pName := "tmp-postprocessing-name"
 			format := "junit"
 
+			idx += 1
+			createDebugFile("2-exe", idx)
+			logrus.Trace(">><< A1")
+			chmod := exec.Command("chmod", "0644", fmt.Sprintf("%s/*.xml", ph.GetResultsDir()))
+			_, err := chmod.CombinedOutput()
+			if err != nil {
+				logrus.Trace(">><< A1.err")
+				logrus.Error(err)
+				//return err
+			}
+
 			// TODO(johnschnake): I think we should be able to call into a higher level function to process different
 			// formats and automatically be more robust. TBD. It needs to just know the format the plugin was providing
 			// here, but we'd ultimately end up sending out manual results.
@@ -124,6 +153,8 @@ func getRootCmd() *cobra.Command {
 					ResultFormat: format,
 				},
 			}
+			idx += 1
+			createDebugFile("3-proc", idx)
 			p := job.NewPlugin(m, "", "", "", "", nil)
 			logrus.Trace(">><< B")
 			items, err := results.ProcessDir(p, "", dir, results.JunitProcessFile, results.FileOrExtension([]string{}, ".xml"))
@@ -143,15 +174,16 @@ func getRootCmd() *cobra.Command {
 					results.MetadataTypeKey: results.MetadataTypeSummary,
 				},
 			}
-
+			idx += 1
+			createDebugFile("4-proc", idx)
 			logrus.Trace(">><< 0")
 			output.Items = append(output.Items, items...)
 			output.Status = results.AggregateStatus(output.Items...)
 			logrus.Trace(">><< 1")
 			//logrus.Trace(output)
 			SaveYAML(output)
-			logrus.Trace(">><< 2")
-			logrus.Trace(">><< 2A copy")
+
+			// logrus.Trace(">><< 2A copy")
 			// cp := exec.Command("cp", "-rf",
 			// 	fmt.Sprintf("%v/sonobuoy_results.yaml", ph.GetResultsDir()),
 			// 	fmt.Sprintf("%v/sonobuoy_results2.yaml", ph.GetResultsDir()))
@@ -162,11 +194,19 @@ func getRootCmd() *cobra.Command {
 			// 	return err
 			// }
 			// Now shell out to ytt.
+			logrus.Trace(">><< 2A")
+			yttOutputDir := filepath.Join(os.Getenv("SONOBUOY_RESULTS_DIR"), "transformed")
+			if err := os.MkdirAll(filepath.Dir(yttOutputDir), 0755); err != nil {
+				return errors.Wrap(err, "error creating plugin directory")
+			}
+			logrus.Trace(">><< 2B")
+			idx += 1
+			createDebugFile("5-ytt", idx)
 			c := exec.Command("/usr/bin/ytt",
 				"--dangerous-allow-all-symlink-destinations",
 				fmt.Sprintf("-f=%v/sonobuoy_results.yaml", ph.GetResultsDir()),
-				fmt.Sprintf("-f=%v/ytt-transform-commentFailed.yaml", os.Getenv("SONOBUOY_CONFIG_DIR")),
-				fmt.Sprintf("--output-files=%v", ph.GetResultsDir()))
+				fmt.Sprintf("-f=%v/ytt-transform.yaml", os.Getenv("SONOBUOY_CONFIG_DIR")),
+				fmt.Sprintf("--output-files=%v", yttOutputDir))
 
 			logrus.Trace(">><< 3")
 			b, err := c.CombinedOutput()
@@ -195,14 +235,14 @@ func getRootCmd() *cobra.Command {
 			// 	logrus.Trace(">><< 6.err2")
 			// 	logrus.Error(err)
 			// }
-			// logrus.Trace(">><< 6C")
-			// chmod := exec.Command("chmod", "-R", "0755", ph.GetResultsDir())
-			// _, err = chmod.CombinedOutput()
-			// if err != nil {
-			// 	logrus.Trace(">><< 6C.err")
-			// 	logrus.Error(err)
-			// 	return err
-			// }
+			logrus.Trace(">><< 6C")
+			chmod2 := exec.Command("chmod", "-R", "0755", yttOutputDir)
+			_, err = chmod2.CombinedOutput()
+			if err != nil {
+				logrus.Trace(">><< 6C.err")
+				logrus.Error(err)
+				return err
+			}
 			// ls := exec.Command("ls", "-R", fmt.Sprintf("%v", ph.GetResultsDir()))
 			// lsO, err := ls.CombinedOutput()
 			// if err != nil {
@@ -213,13 +253,19 @@ func getRootCmd() *cobra.Command {
 			// }
 			// logrus.Trace(string(lsO))
 
+			idx += 1
+			createDebugFile("6-pos", idx)
 			logrus.Trace(">><< 7 > Stopping the Ticker")
 			ticker.Stop()
 			done <- true
+			idx += 1
+			createDebugFile("7-pos", idx)
 			logrus.Trace("Done with processing >><<")
 			if DoneFileExists() {
 				err = RemoveDoneFile()
 			}
+			idx += 1
+			createDebugFile("8-pos", idx)
 			return nil
 		},
 	}
