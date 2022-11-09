@@ -30,6 +30,12 @@ sig_handler_save_results() {
 
     pushd "${RESULTS_DIR}" || exit 1
 
+    # raw
+    if [[ "${PLUGIN_ID}" == "3" ]]; then
+        echo "${RESULTS_DIR}/raw-results.tar.gz" > "${RESULTS_DONE_NOTIFY}"
+        os_log_info_local "Results saved at ${RESULTS_DONE_NOTIFY}=[${RESULTS_DIR}/raw-results.tar.gz]";
+        exit
+    fi
     # JUnit
     os_log_info_local "Looking for junit result files..."
     junit_output="$(ls junit*.xml || true)";

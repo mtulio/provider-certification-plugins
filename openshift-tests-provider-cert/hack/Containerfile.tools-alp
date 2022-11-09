@@ -12,7 +12,7 @@ FROM ${CONTAINER_BASE} as base
 # gcompat: allow to run glibc programs (oc and jq)
 # sononbuoy is already built with musl
 RUN apk add --no-cache --update \
-  bash curl grep gcompat
+    bash curl grep gcompat xz
 
 FROM base as clients
 WORKDIR /clients
@@ -20,12 +20,12 @@ WORKDIR /clients
 ADD https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/${VERSION_OC}/openshift-client-linux.tar.gz ./
 ADD https://stedolan.github.io/jq/download/linux64/jq ./
 RUN apk add --no-cache --update tar binutils \
-  && tar xvfz openshift-client-linux.tar.gz \
-  && rm -f openshift-client-linux.tar.gz kubectl README.md \
-  && chmod +x jq oc \
-  && strip oc
+    && tar xvfz openshift-client-linux.tar.gz \
+    && rm -f openshift-client-linux.tar.gz kubectl README.md \
+    && chmod +x jq oc \
+    && strip oc
 
-# Tool image
+# Tools image
 FROM base
 LABEL io.k8s.display-name="OpenShift Tests for Provider Certification Tools" \
       io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \

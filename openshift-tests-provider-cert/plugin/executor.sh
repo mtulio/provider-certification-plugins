@@ -8,8 +8,8 @@
 # to handle errors (failed e2e) on sub-process managed by openshift-tests main proc.
 # https://issues.redhat.com/browse/SPLAT-592
 #set -o pipefail
-set -o nounset
 # set -o errexit
+set -o nounset
 
 os_log_info "[executor] Starting..."
 
@@ -21,6 +21,39 @@ test ! -f "${SA_TOKEN_PATH}" || os_log_info "[executor] secret not found=${SA_TO
 # Executor options
 #
 os_log_info "[executor] Executor started. Choosing execution type based on environment sets."
+
+run_upgrade() {
+    set -x &&
+    #TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" &&
+    #TARGET_RELEASES=$(oc adm release info 4.11.13 -o jsonpath={.image})
+    os_log_info "[executor] TARGET_RELEASES=${TARGET_RELEASES}"
+    os_log_info "[executor] [upgrade] show current version:"
+    oc get clusterversion
+
+    TEST_UPGRADE_SUITE="none"
+    ${UTIL_OTESTS_BIN} run-upgrade "${TEST_UPGRADE_SUITE}" \
+        --to-image "${TARGET_RELEASES}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --junit-dir "${RESULTS_DIR}" \
+        | tee -a "${RESULTS_PIPE}" &
+    wait "$!" &&
+    set +x
+}
+
+function upgrade_conformance() {
+    local exit_code=0 &&
+    run_upgrade || exit_code=$? &&
+    PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
+    if test False = "${PROGRESSING}"
+    then
+        #TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE="${CERT_TEST_SUITE}" suite || exit_code=$?
+        echo "Upgrade_conformance have been finished, passing to the next plugin to run conformance."
+    else
+        echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    fi &&
+    return $exit_code
+}
+
 
 if [[ -n "${CERT_TEST_SUITE}" ]]; then
     os_log_info "Starting openshift-tests suite [${CERT_TEST_SUITE}] Provider Conformance executor..."
@@ -50,6 +83,7 @@ if [[ -n "${CERT_TEST_SUITE}" ]]; then
             --junit-dir "${RESULTS_DIR}" \
             -f "${RESULTS_DIR}/suite-${CERT_TEST_SUITE/\/}-DEV.list" \
             | tee -a "${RESULTS_PIPE}" || true
+
     else
         os_log_info "Running the test suite..."
         ${UTIL_OTESTS_BIN} run \
@@ -62,7 +96,34 @@ if [[ -n "${CERT_TEST_SUITE}" ]]; then
     os_log_info "openshift-tests finished[$?]"
     set +x
 
-# To run custom tests, set the environment CERT_LEVEL on plugin definition.
+# run-upgrade tests
+elif [[ "${PLUGIN_ID}" == "2" ]]; then
+
+    if [[ "${RUN_MODE-}" == "upgrade" ]]; then
+        upgrade_conformance
+        # TODO: we must update openshift-tests binary after upgrade to make sure 
+        # conformance plugins will run with updated binary
+
+        # shellcheck disable=SC1091
+        rm -f ${UTIL_OTESTS_BIN}
+        start_utils_extractor
+    else
+        create_junit_with_msg "pass" "[opct][pass] ignoring upgrade mode."
+    fi
+
+# finalizer-collecting-artifacts
+elif [[ "${PLUGIN_ID}" == "3" ]]; then
+
+    cd ${RESULTS_DIR}
+    oc adm must-gather
+    tar cfJ artifacts_must-gather.tar.xz must-gather.local.*
+
+    ${UTIL_OTESTS_BIN} run kubernetes/conformance --dry-run > ./artifacts_e2e-tests_kubernetes-conformance.txt
+    ${UTIL_OTESTS_BIN} run openshift/conformance --dry-run > ./artifacts_e2e-openshift-conformance.txt
+
+    tar cfz raw-results.tar.gz ./artifacts_*
+
+# To run custom tests, set the environment PLUGIN_ID on plugin definition.
 # To generate the test file, use the script hack/generate-tests-tiers.sh
 elif [[ -n "${CERT_TEST_FILE:-}" ]]; then
     os_log_info "Running openshift-tests for custom tests [${CERT_TEST_FILE}]..."
@@ -87,7 +148,7 @@ elif [[ -n "${CUSTOM_TEST_FILTER_STR:-}" ]]; then
         | tee -a "${RESULTS_PIPE}" || true
 
 # Default execution - running default suite.
-# Set E2E_SUITE on plugin manifest to change it (unset CERT_LEVEL).
+# Set E2E_SUITE on plugin manifest to change it (unset PLUGIN_ID).
 else
     suite="${E2E_SUITE:-kubernetes/conformance}"
     os_log_info "Running default execution for openshift-tests suite [${suite}]..."

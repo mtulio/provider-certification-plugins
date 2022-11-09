@@ -34,37 +34,38 @@ create_dependencies_plugin() {
 # and PLUGIN_BLOCKED_BY.
 init_config() {
     os_log_info_local "[init_config]"
-    if [[ -z "${CERT_LEVEL:-}" ]]
+    if [[ -z "${PLUGIN_ID:-}" ]]
     then
-        os_log_info_local "Empty CERT_LEVEL. It should be defined. Exiting..."
+        os_log_info_local "Empty PLUGIN_ID. It should be defined. Exiting..."
         exit 1
     fi
 
-    os_log_info_local "Setting config for CERT_LEVEL=[${CERT_LEVEL:-}]..."
-    if [[ "${CERT_LEVEL:-}" == "0" ]]
+    os_log_info_local "Setting config for PLUGIN_ID=[${PLUGIN_ID:-}]..."
+    if [[ "${PLUGIN_ID:-}" == "0" ]]
     then
-        PLUGIN_NAME="openshift-kube-conformance"
+        PLUGIN_NAME="10-openshift-kube-conformance"
         CERT_TEST_SUITE="kubernetes/conformance"
-        PLUGIN_BLOCKED_BY=()
+        PLUGIN_BLOCKED_BY=("01-openshift-cluster-upgrade")
 
-    elif [[ "${CERT_LEVEL:-}" == "1" ]]
+    elif [[ "${PLUGIN_ID:-}" == "1" ]]
     then
-        PLUGIN_NAME="openshift-conformance-validated"
+        PLUGIN_NAME="20-openshift-conformance-validated"
         CERT_TEST_SUITE="openshift/conformance"
-        PLUGIN_BLOCKED_BY+=("openshift-kube-conformance")
+        PLUGIN_BLOCKED_BY+=("10-openshift-kube-conformance")
 
-    elif [[ "${CERT_LEVEL:-}" == "2" ]]
+    elif [[ "${PLUGIN_ID:-}" == "2" ]]
     then
-        PLUGIN_NAME="openshift-provider-cert-level2"
-        PLUGIN_BLOCKED_BY+=("openshift-conformance-validated")
+        PLUGIN_NAME="01-openshift-cluster-upgrade"
+        PLUGIN_BLOCKED_BY=()
+        RUN_MODE="upgrade"
 
-    elif [[ "${CERT_LEVEL:-}" == "3" ]]
+    elif [[ "${PLUGIN_ID:-}" == "3" ]]
     then
-        PLUGIN_NAME="openshift-provider-cert-level3"
-        PLUGIN_BLOCKED_BY+=("openshift-provider-cert-level2")
+        PLUGIN_NAME="99-openshift-artifacts-collector"
+        PLUGIN_BLOCKED_BY=("20-openshift-conformance-validated")
 
     else
-        os_log_info "[init_config] Unknow value for CERT_LEVEL=[${CERT_LEVEL:-}]"
+        os_log_info "[init_config] Unknow value for PLUGIN_ID=[${PLUGIN_ID:-}]"
         exit 1
     fi
 
@@ -82,7 +83,9 @@ show_config() {
 #> Config Dump [start] <#
 PLUGIN_NAME=${PLUGIN_NAME}
 PLUGIN_BLOCKED_BY=${PLUGIN_BLOCKED_BY[*]}
-CERT_LEVEL=${CERT_LEVEL}
+PLUGIN_ID=${PLUGIN_ID}
+RUN_MODE=${RUN_MODE}
+TARGET_RELEASES=${TARGET_RELEASES-}
 CERT_TEST_SUITE=${CERT_TEST_SUITE}
 CERT_TEST_COUNT=${CERT_TEST_COUNT}
 CERT_TEST_PARALLEL=${CERT_TEST_PARALLEL}
@@ -214,6 +217,7 @@ start_utils_extractor() {
     os_log_info_local "[extractor_start] unlocking extractor"
     touch "${UTIL_OTESTS_READY}"
 }
+export -f start_utils_extractor
 
 # wait_utils_extractor waits the UTIL_OTESTS_READY control file to be created,
 # it will be ready when the openshift-tests is extracted from internal registry,

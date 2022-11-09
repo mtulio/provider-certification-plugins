@@ -155,6 +155,28 @@ watch_dependency_done() {
     os_log_info_local "[plugin dependencies] Finished!"
 }
 
+update_pogress_upgrade() {
+    local progress_st
+    local progress_message
+    while true; do
+        if [[ -f "${PLUGIN_DONE_NOTIFY}" ]]
+        then
+            echo "[report_progress] Done file detected"
+            break
+        fi
+        progress_st=$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)
+        progress_message="upgrade-progressing-${progress_st}"
+        if [[ "$progress_st" == "True" ]]; then
+            progress_message=$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].message}' clusterversion version)
+        else
+            desired_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+            progress_message="${desired_version}=${progress_message}"
+        fi
+        update_progress "updater" "status=${progress_message}";
+        sleep 10
+    done
+}
+
 # report_progress reads the pipe file, parses the progress counters and reports it
 # to worker progress endpoint until the piple file is closed and Done file is created
 # by plugin container.
@@ -188,7 +210,7 @@ report_progress() {
                 has_update=1;
             fi
 
-            if [ $has_update -eq 1 ]; then
+            if [[ $has_update -eq 1 ]] && [[ "${PLUGIN_ID}" != "2" ]]; then
                 update_progress "updater" "status=running";
                 has_update=0;
             fi
@@ -222,6 +244,12 @@ PIDS_LOCAL+=($!)
 
 watch_dependency_done &
 PIDS_LOCAL+=($!)
+
+# upgrade plugin
+if [[ "${PLUGIN_ID}" == "2" ]]; then
+    update_pogress_upgrade &
+    PIDS_LOCAL+=($!)
+fi
 
 report_progress
 

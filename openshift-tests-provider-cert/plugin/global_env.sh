@@ -2,11 +2,10 @@
 
 declare -gx PLUGIN_NAME
 declare -gx PLUGIN_BLOCKED_BY
+declare -gx PLUGIN_ID
 declare -gx DEV_TESTS_COUNT
+declare -gx RUN_MODE
 
-declare -grx CERT_TESTS_DIR="./tests/${OPENSHIFT_VERSION:-"v4.10"}"
-
-declare -gx CERT_LEVEL
 declare -gx CERT_TEST_FILE
 declare -gx CERT_TEST_COUNT
 declare -gx CERT_TEST_SUITE
@@ -36,6 +35,7 @@ declare -grx UTIL_OTESTS_READY="${SHARED_DIR}/openshift-tests.ready"
 declare -grx UTIL_OTESTS_FAILED="${SHARED_DIR}/openshift-tests.failed"
 
 # Defaults
+RUN_MODE="regular"
 CERT_TEST_FILE=""
 CERT_TEST_SUITE=""
 CERT_TEST_COUNT=0
