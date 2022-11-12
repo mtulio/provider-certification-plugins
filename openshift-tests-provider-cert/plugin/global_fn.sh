@@ -41,28 +41,31 @@ init_config() {
     fi
 
     os_log_info_local "Setting config for PLUGIN_ID=[${PLUGIN_ID:-}]..."
-    if [[ "${PLUGIN_ID:-}" == "0" ]]
+    if [[ "${PLUGIN_ID:-}" == "${PLUGIN_ID_KUBE_CONFORMANCE}" ]]
     then
-        PLUGIN_NAME="10-openshift-kube-conformance"
-        CERT_TEST_SUITE="kubernetes/conformance"
-        PLUGIN_BLOCKED_BY=("01-openshift-cluster-upgrade")
+        PLUGIN_NAME="${PLUGIN_NAME_KUBE_CONFORMANCE}"
+        CERT_TEST_SUITE="${OPENSHIFT_TESTS_SUITE_KUBE_CONFORMANCE}"
+        PLUGIN_BLOCKED_BY=("${PLUGIN_NAME_OPENSHIFT_UPGRADE}")
+        #PLUGIN_BLOCKED_BY=()
 
-    elif [[ "${PLUGIN_ID:-}" == "1" ]]
+    elif [[ "${PLUGIN_ID:-}" == "${PLUGIN_ID_OPENSHIFT_CONFORMANCE}" ]]
     then
-        PLUGIN_NAME="20-openshift-conformance-validated"
-        CERT_TEST_SUITE="openshift/conformance"
-        PLUGIN_BLOCKED_BY+=("10-openshift-kube-conformance")
+        PLUGIN_NAME="${PLUGIN_NAME_OPENSHIFT_CONFORMANCE}"
+        CERT_TEST_SUITE="${OPENSHIFT_TESTS_SUITE_OPENSHIFT_CONFORMANCE}"
+        PLUGIN_BLOCKED_BY+=("${PLUGIN_NAME_KUBE_CONFORMANCE}")
 
-    elif [[ "${PLUGIN_ID:-}" == "2" ]]
+    elif [[ "${PLUGIN_ID:-}" == "${PLUGIN_ID_OPENSHIFT_UPGRADE}" ]]
     then
-        PLUGIN_NAME="01-openshift-cluster-upgrade"
+        PLUGIN_NAME="${PLUGIN_NAME_OPENSHIFT_UPGRADE}"
         PLUGIN_BLOCKED_BY=()
         RUN_MODE="upgrade"
+        PLUGIN_RESULT_FORMAT="raw"
 
-    elif [[ "${PLUGIN_ID:-}" == "3" ]]
+    elif [[ "${PLUGIN_ID:-}" == "${PLUGIN_ID_OPENSHIFT_ARTIFACTS}" ]]
     then
-        PLUGIN_NAME="99-openshift-artifacts-collector"
-        PLUGIN_BLOCKED_BY=("20-openshift-conformance-validated")
+        PLUGIN_NAME="${PLUGIN_NAME_OPENSHIFT_ARTIFACTS}"
+        PLUGIN_BLOCKED_BY=("${PLUGIN_NAME_OPENSHIFT_CONFORMANCE}")
+        PLUGIN_RESULT_FORMAT="raw"
 
     else
         os_log_info "[init_config] Unknow value for PLUGIN_ID=[${PLUGIN_ID:-}]"
@@ -85,7 +88,7 @@ PLUGIN_NAME=${PLUGIN_NAME}
 PLUGIN_BLOCKED_BY=${PLUGIN_BLOCKED_BY[*]}
 PLUGIN_ID=${PLUGIN_ID}
 RUN_MODE=${RUN_MODE}
-TARGET_RELEASES=${TARGET_RELEASES-}
+UPGRADE_RELEASES=${UPGRADE_RELEASES-}
 CERT_TEST_SUITE=${CERT_TEST_SUITE}
 CERT_TEST_COUNT=${CERT_TEST_COUNT}
 CERT_TEST_PARALLEL=${CERT_TEST_PARALLEL}

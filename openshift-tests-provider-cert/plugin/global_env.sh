@@ -3,6 +3,7 @@
 declare -gx PLUGIN_NAME
 declare -gx PLUGIN_BLOCKED_BY
 declare -gx PLUGIN_ID
+declare -gx PLUGIN_RESULT_FORMAT
 declare -gx DEV_TESTS_COUNT
 declare -gx RUN_MODE
 
@@ -33,6 +34,31 @@ declare -grx SA_TOKEN_PATH="/var/run/secrets/kubernetes.io/serviceaccount/token"
 declare -grx UTIL_OTESTS_BIN="${SHARED_DIR}/openshift-tests"
 declare -grx UTIL_OTESTS_READY="${SHARED_DIR}/openshift-tests.ready"
 declare -grx UTIL_OTESTS_FAILED="${SHARED_DIR}/openshift-tests.failed"
+
+# PLUGIN Instances
+declare -grx PLUGIN_ID_KUBE_CONFORMANCE="10"
+declare -grx PLUGIN_NAME_KUBE_CONFORMANCE="${PLUGIN_ID_KUBE_CONFORMANCE}-openshift-kube-conformance"
+declare -grx OPENSHIFT_TESTS_SUITE_KUBE_CONFORMANCE="kubernetes/conformance"
+
+declare -grx PLUGIN_ID_OPENSHIFT_CONFORMANCE="20"
+declare -grx PLUGIN_NAME_OPENSHIFT_CONFORMANCE="${PLUGIN_ID_OPENSHIFT_CONFORMANCE}-openshift-conformance-validated"
+declare -grx OPENSHIFT_TESTS_SUITE_OPENSHIFT_CONFORMANCE="openshift/conformance"
+
+declare -grx PLUGIN_ID_OPENSHIFT_UPGRADE="05"
+declare -grx PLUGIN_NAME_OPENSHIFT_UPGRADE="${PLUGIN_ID_OPENSHIFT_UPGRADE}-openshift-cluster-upgrade"
+
+declare -grx PLUGIN_ID_OPENSHIFT_ARTIFACTS="99"
+declare -grx PLUGIN_NAME_OPENSHIFT_ARTIFACTS="${PLUGIN_ID_OPENSHIFT_ARTIFACTS}-openshift-artifacts-collector"
+
+# declare -grx PLUGIN_ID_OPENSHIFT_UPGRADE="05"
+declare -grx PLUGIN_RUN_MODE_UPGRADE="upgrade"
+
+declare -grx SONOBUOY_PLUGIN_STATUS_COMPLETE="complete"
+declare -grx SONOBUOY_PLUGIN_STATUS_FAILED="failed"
+declare -grx SONOBUOY_PLUGIN_STATUS_RUNNING="running"
+
+declare -grx RESULT_RAW_FILE_NAME="raw-results.tar.gz"
+declare -grx RESULT_RAW_FILE_PATH="${RESULTS_DIR}/${RESULT_RAW_FILE_NAME}"
 
 # Defaults
 RUN_MODE="regular"

@@ -95,8 +95,8 @@ watch_dependency_done() {
             fi
 
             plugin_status=$(jq -r ".plugins[] | select (.plugin == \"${plugin_name}\" ) |.status // \"\"" "${STATUS_FILE}")
-            if [[ "${plugin_status}" == "complete" ]]; then
-                echo "Plugin[${plugin_name}] with status[${plugin_status}] is completed!"
+            if [[ "${plugin_status}" == "${SONOBUOY_PLUGIN_STATUS_COMPLETE}" ]] || [[ "${plugin_status}" == "${SONOBUOY_PLUGIN_STATUS_FAILED}" ]]; then
+                echo "Plugin[${plugin_name}] with status[${plugin_status}] is finished!"
                 break
             fi
             count=$(jq -r ".plugins[] | select (.plugin == \"${plugin_name}\" ) |.progress.completed // 0" "${STATUS_FILE}")
@@ -210,7 +210,7 @@ report_progress() {
                 has_update=1;
             fi
 
-            if [[ $has_update -eq 1 ]] && [[ "${PLUGIN_ID}" != "2" ]]; then
+            if [[ $has_update -eq 1 ]] && [[ "${PLUGIN_ID}" != "${PLUGIN_ID_OPENSHIFT_UPGRADE}" ]]; then
                 update_progress "updater" "status=running";
                 has_update=0;
             fi
@@ -246,7 +246,7 @@ watch_dependency_done &
 PIDS_LOCAL+=($!)
 
 # upgrade plugin
-if [[ "${PLUGIN_ID}" == "2" ]]; then
+if [[ "${PLUGIN_ID}" == "${PLUGIN_ID_OPENSHIFT_UPGRADE}" ]]; then
     update_pogress_upgrade &
     PIDS_LOCAL+=($!)
 fi
