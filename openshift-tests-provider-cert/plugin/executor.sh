@@ -24,8 +24,6 @@ os_log_info "[executor] Executor started. Choosing execution type based on envir
 
 run_upgrade() {
     set -x &&
-    #TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" &&
-    #TARGET_RELEASES=$(oc adm release info 4.11.13 -o jsonpath={.image})
     os_log_info "[executor] UPGRADE_RELEASES=${UPGRADE_RELEASES}"
     os_log_info "[executor] [upgrade] show current version:"
     oc get clusterversion
@@ -36,22 +34,21 @@ run_upgrade() {
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --junit-dir "${RESULTS_DIR}" \
         | tee -a "${RESULTS_PIPE}"
-    #wait "$!" &&
     set +x
 }
 
-# function upgrade_conformance() {
-#     local exit_code=0 &&
-#     run_upgrade || exit_code=$? &&
-#     PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
-#     if test False = "${PROGRESSING}"
-#     then
-#         #TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE="${CERT_TEST_SUITE}" suite || exit_code=$?
-#         echo "Upgrade_conformance have been finished, passing to the next plugin to run conformance."
-#     else
-#         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
-#     fi &&
-#     return $exit_code
+# function scc_enable() {
+#     # TODO fix scc: https://github.com/cncf/k8s-conformance/tree/master/v1.24/openshift#run-conformance-tests
+#     os_log_info "[workaround/scc] Setting unprivileged users to run root level containers..."
+#     oc adm policy add-scc-to-group privileged system:authenticated system:serviceaccounts || true
+#     oc adm policy add-scc-to-group anyuid system:authenticated system:serviceaccounts || true
+# }
+
+# function scc_disable() {
+#     # TODO fix scc: https://github.com/cncf/k8s-conformance/tree/master/v1.24/openshift#run-conformance-tests
+#     os_log_info "[workaround/scc] Unsetting unprivileged users to run root level containers..."
+#     oc adm policy remove-scc-from-group anyuid system:authenticated system:serviceaccounts || true
+#     oc adm policy remove-scc-from-group privileged system:authenticated system:serviceaccounts || true
 # }
 
 
@@ -59,10 +56,10 @@ if [[ -n "${CERT_TEST_SUITE}" ]]; then
     os_log_info "Starting openshift-tests suite [${CERT_TEST_SUITE}] Provider Conformance executor..."
 
     # TODO fix scc: https://github.com/cncf/k8s-conformance/tree/master/v1.24/openshift#run-conformance-tests
-    os_log_info_local "[workaround/scc] Setting unprivileged users to run root level containers..."
-    oc adm policy add-scc-to-group privileged system:authenticated system:serviceaccounts || true
-    oc adm policy add-scc-to-group anyuid system:authenticated system:serviceaccounts || true
-
+    # os_log_info_local "[workaround/scc] Setting unprivileged users to run root level containers..."
+    # scc_enable
+    # Always enable
+    # scc_enable
     set -x
     ${UTIL_OTESTS_BIN} run \
         --max-parallel-tests "${CERT_TEST_PARALLEL}" \
@@ -97,11 +94,6 @@ if [[ -n "${CERT_TEST_SUITE}" ]]; then
             "${CERT_TEST_SUITE}" \
             | tee -a "${RESULTS_PIPE}" || true
     fi
-
-    # TODO fix scc: https://github.com/cncf/k8s-conformance/tree/master/v1.24/openshift#run-conformance-tests
-    os_log_info_local "[workaround/scc] Unsetting unprivileged users to run root level containers..."
-    oc adm policy remove-scc-from-group anyuid system:authenticated system:serviceaccounts || true
-    oc adm policy remove-scc-from-group privileged system:authenticated system:serviceaccounts || true
 
     os_log_info "openshift-tests finished[$?]"
     set +x
