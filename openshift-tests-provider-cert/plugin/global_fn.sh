@@ -199,14 +199,32 @@ export -f create_junit_with_msg
 start_utils_extractor() {
     os_log_info "[extractor_start] Starting"
 
+    local registry_host
+    local registry_host_router
+    local registry_args
+    registry_host="image-registry.openshift-image-registry.svc:5000"
+    registry_host_router=$(${UTIL_OC_BIN} get routes -n openshift-image-registry -o json \
+        | jq -r '.items[] | select(.metadata.name == "default-route").spec.host // ""')
+    registry_args=""
+
+    if [ -n "${registry_host_router:-}" ]; then
+        os_log_info "[extractor_start] Setring up login to registry with host ${registry_host_router}"
+        # create a token for registry
+        registry_token=$(oc create token image-puller -n openshift-config)
+        registry_host=${registry_host_router}
+
+        registry_args="--registry=${registry_host} --auth-basic=image-puller:${registry_token}"
+        os_log_info "[extractor_start] Setring up login to registry with args: --registry=${registry_host} --auth-basic=image-puller:xxx"
+    fi
+
     os_log_info "[extractor_start] Login to OpenShift Registry"
-    ${UTIL_OC_BIN} registry login
+    ${UTIL_OC_BIN} registry login ${registry_args}
 
     # Extracting oc (from tests image)
     local util_oc="./oc"
-    os_log_info "[extractor_start][oc] Extracting oc utility from 'tests' image"
+    os_log_info "[extractor_start][oc] Extracting oc utility from '${registry_host}/openshift/tests:latest' image"
     ${UTIL_OC_BIN} image extract \
-        image-registry.openshift-image-registry.svc:5000/openshift/tests:latest \
+        ${registry_host}/openshift/tests:latest \
         --insecure=true \
         --file="/usr/bin/oc"
 
@@ -238,7 +256,7 @@ start_utils_extractor() {
     local util_otests="./openshift-tests"
     os_log_info "[extractor_start][openshift-tests] Extracting the utility"
     ${UTIL_OC_BIN} image extract \
-        image-registry.openshift-image-registry.svc:5000/openshift/tests:latest \
+        ${registry_host}/openshift/tests:latest \
         --insecure=true \
         --file="/usr/bin/openshift-tests"
 
