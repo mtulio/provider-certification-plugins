@@ -182,6 +182,27 @@ collect_tests_upgrade() {
     os_log_info "[executor][PluginID#${PLUGIN_ID}] e2e count ${suite} collected> ${CNT_C}"
 }
 
+# Run etcd-fio tests in development environment
+collect_must_gather() {
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio"
+
+    local master_node
+    local worker_node
+
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio - getting nodes"
+    master_node=$(${UTIL_OC_BIN} get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
+    worker_node=$(${UTIL_OC_BIN} get nodes -l worker-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+    cmd_run="podman run --volume /var/lib/etcd:/var/lib/etcd:Z quay.io/openshift-scale/etcd-perf"
+
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio - running on master node ${master_node}"
+    oc debug "node/${master_node}" -- chroot /host /bin/bash -c \
+        "$cmd_run  || true" | tee -a artifacts_etcd-fio_master.txt
+
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio - running on worker node ${worker_node}"
+    oc debug "node/${worker_node}" -- chroot /host /bin/bash -c \
+        "mkdir /var/lib/etcd || true; $cmd_run  || true" | tee -a artifacts_etcd-fio_worker.txt 
+}
+
 # Run Plugin for Collecor. The Collector plugin is the last one executed on the
 # cluster. It will collect custom files used on the Validation environment, at the
 # end it will generate a tarbal file to submit the raw results to Sonobuoy.
@@ -189,6 +210,9 @@ run_plugin_collector() {
     os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector"
 
     pushd "${RESULTS_DIR}" || true
+
+    # Collecting etcd-fio metrics
+    collect_etcdfio
 
     # Collecting must-gather
     collect_must_gather
