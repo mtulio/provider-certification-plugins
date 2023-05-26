@@ -72,10 +72,15 @@ init_config() {
         CERT_TEST_SUITE="${OPENSHIFT_TESTS_SUITE_OPENSHIFT_CONFORMANCE}"
         PLUGIN_BLOCKED_BY+=("${PLUGIN_NAME_KUBE_CONFORMANCE}")
 
+    elif [[ "${PLUGIN_ID:-}" == "${PLUGIN_ID_CONFORMANCE_EXTERNAL}" ]]
+    then
+        PLUGIN_NAME="${PLUGIN_NAME_CONFORMANCE_EXTERNAL}"
+        PLUGIN_BLOCKED_BY+=("${PLUGIN_NAME_OPENSHIFT_CONFORMANCE}")
+
     elif [[ "${PLUGIN_ID:-}" == "${PLUGIN_ID_OPENSHIFT_ARTIFACTS_COLLECTOR}" ]]
     then
         PLUGIN_NAME="${PLUGIN_NAME_OPENSHIFT_ARTIFACTS_COLLECTOR}"
-        PLUGIN_BLOCKED_BY+=("${PLUGIN_NAME_OPENSHIFT_CONFORMANCE}")
+        PLUGIN_BLOCKED_BY+=("${PLUGIN_NAME_CONFORMANCE_EXTERNAL}")
 
     else
         err="[init_config] Unknown value for PLUGIN_ID=[${PLUGIN_ID:-}]"
@@ -85,8 +90,6 @@ init_config() {
     fi
 
     os_log_info "Plugin Config: PLUGIN_NAME=[${PLUGIN_NAME:-}] PLUGIN_BLOCKED_BY=[${PLUGIN_BLOCKED_BY[*]}] CERT_TEST_FILE=[${CERT_TEST_FILE}]"
-
-
     os_log_info "Setup config done."
 }
 export -f init_config

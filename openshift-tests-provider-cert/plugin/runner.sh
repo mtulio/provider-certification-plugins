@@ -33,10 +33,12 @@ sig_handler_save_results() {
 
     # custom result by plugin
     ## artifacts-collector: raw
-    if [[ "${PLUGIN_ID}" == "${PLUGIN_ID_OPENSHIFT_ARTIFACTS_COLLECTOR}" ]]; then
+    if [[ "${PLUGIN_ID}" == "${PLUGIN_ID_OPENSHIFT_ARTIFACTS_COLLECTOR}" ]] || 
+        [[ "${PLUGIN_ID}" == "${PLUGIN_ID_CONFORMANCE_EXTERNAL}" ]]; then
         echo "${RESULTS_DIR}/raw-results.tar.gz" > "${RESULTS_DONE_NOTIFY}"
         os_log_info "Results saved at ${RESULTS_DONE_NOTIFY}=[${RESULTS_DIR}/raw-results.tar.gz]";
         exit
+
     elif [[ "${PLUGIN_ID}" == "${PLUGIN_ID_OPENSHIFT_UPGRADE}" ]]; then
         # 'openshift-tests run-upgrade' generates 3 JUnits (2x junit_e2e_*.xml, 1x junit_upgrade_*.xml)
         # TODO: it's desired to collect all openshift-tests metadata.

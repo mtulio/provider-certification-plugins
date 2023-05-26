@@ -109,6 +109,12 @@ run_plugins_conformance() {
             | tee -a "${RESULTS_PIPE}" || true
 
         os_log_info "[executor][PluginID#${PLUGIN_ID}] openshift-tests finished[$?] (DEV Mode)"
+
+        os_log_info "[executor][PluginID#${PLUGIN_ID}] Requesting risk analysis for test failures in this job run from sippy:"
+        ${UTIL_OTESTS_BIN} risk-analysis --junit-dir "${RESULTS_DIR}/" || true
+        os_log_info "[executor][PluginID#${PLUGIN_ID}] Reading risk-analysis.json:"
+        # TODO save in artifacts
+        cat "${RESULTS_DIR}/risk-analysis.json" || true
         return
     fi
 
@@ -122,6 +128,12 @@ run_plugins_conformance() {
         | tee -a "${RESULTS_PIPE}" || true
 
     os_log_info "[executor][PluginID#${PLUGIN_ID}] openshift-tests finished[$?]"
+
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Requesting risk analysis for test failures in this job run from sippy:"
+    ${UTIL_OTESTS_BIN} risk-analysis --junit-dir "${RESULTS_DIR}/" || true
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Reading risk-analysis.json:"
+    # TODO save in artifacts
+    cat "${RESULTS_DIR}/risk-analysis.json" || true
     set +x
 }
 
@@ -183,7 +195,7 @@ collect_tests_upgrade() {
 }
 
 # Run etcd-fio tests in development environment
-collect_must_gather() {
+collect_etcdfio() {
     os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio"
 
     local master_node
@@ -191,7 +203,7 @@ collect_must_gather() {
 
     os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio - getting nodes"
     master_node=$(${UTIL_OC_BIN} get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
-    worker_node=$(${UTIL_OC_BIN} get nodes -l worker-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+    worker_node=$(${UTIL_OC_BIN} get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
     cmd_run="podman run --volume /var/lib/etcd:/var/lib/etcd:Z quay.io/openshift-scale/etcd-perf"
 
     os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Artifacts Collector: etcd-fio - running on master node ${master_node}"
@@ -232,6 +244,15 @@ run_plugin_collector() {
     popd || true;
 }
 
+function run_plugin_platexternal() {
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Starting Platform External Runner"
+    set -x
+    bash -x "${SONOBUOY_CONFIG_DIR}/platform-external-e2e-run.sh" || true
+    echo "result" > "${RESULTS_DIR}/test.txt" || true
+    tar cfz /tmp/raw-results.tar.gz "${RESULTS_DIR}/*" || true
+    mv /tmp/raw-results.tar.gz "${RESULTS_DIR}/" || true
+}
+
 #
 # Executor options
 #
@@ -242,6 +263,7 @@ case "${PLUGIN_ID}" in
     "${PLUGIN_ID_OPENSHIFT_UPGRADE}") run_plugin_upgrade ;;
     "${PLUGIN_ID_KUBE_CONFORMANCE}"|"${PLUGIN_ID_OPENSHIFT_CONFORMANCE}") run_plugins_conformance ;;
     "${PLUGIN_ID_OPENSHIFT_ARTIFACTS_COLLECTOR}") run_plugin_collector ;;
+    "${PLUGIN_ID_CONFORMANCE_EXTERNAL}") run_plugin_platexternal ;;
     *) os_log_info "[executor] PluginID." ;;
 esac
 
