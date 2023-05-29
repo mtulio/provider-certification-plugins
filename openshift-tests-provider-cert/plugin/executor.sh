@@ -139,9 +139,11 @@ collect_must_gather() {
     # > insights rules
 
     # extracting msg from etcd logs: request latency apply took too long (attl)
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Parsing etcd-logs from must-gather: all"
     cat must-gather-opct/*/namespaces/openshift-etcd/pods/*/etcd/etcd/logs/current.log \
         | ocp-etcd-log-filters \
         > artifacts_must-gather_parser-etcd-attl-all.txt
+    os_log_info "[executor][PluginID#${PLUGIN_ID}] Parsing etcd-logs from must-gather: by hour"
     cat must-gather-opct/*/namespaces/openshift-etcd/pods/*/etcd/etcd/logs/current.log \
         | ocp-etcd-log-filters -aggregator hour \
         > artifacts_must-gather_parser-etcd-attl-hour.txt

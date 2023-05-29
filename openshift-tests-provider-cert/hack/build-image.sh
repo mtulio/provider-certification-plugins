@@ -23,7 +23,7 @@ VERSION_PLUGIN_DEVEL="${VERSION_DEVEL:-}";
 FORCE="${FORCE:-false}";
 
 # TOOLS version is created by suffix of oc and sonobuoy versions w/o dots
-export VERSION_TOOLS="v0.0.0-alp3165-oc4121-s05612-v0"
+export VERSION_TOOLS="v0.0.0-alp3165-oc4121-s05612-v1"
 export CONTAINER_BASE="alpine:3.16.5"
 export VERSION_OC="4.12.1"
 export VERSION_SONOBUOY="v0.56.12"
@@ -112,8 +112,13 @@ builder_tools() {
 pusher_tools() {
     echo "#> Upload images ${IMAGE_TOOLS}"
     push_image "${CONTAINER_TOOLS}"
-    push_image "${IMAGE_TOOLS}:latest"
-    push_image "${IMAGE_TOOLS}:${VERSION_TOOLS}"
+}
+
+pusher_tool_latest() {
+    echo "#> Upload images ${IMAGE_TOOLS}:latest"
+    if ! push_image "${IMAGE_TOOLS}:latest"; then
+        echo "Error uploading image ${IMAGE_TOOLS}:latest, was it already built with build-tools?"
+    fi
 }
 
 build_tools() {
@@ -200,6 +205,7 @@ case $COMMAND in
     "build-plugin") build_plugin ;;
     "build-tools") build_tools ;;
     "push-tools") push_tools ;;
+    "push-tools-latest") pusher_tool_latest ;;
     "build-dev") build_plugin ; pusher_plugin ;;
     "release") release;;
     *) echo "Option [$COMMAND] not found"; exit 1 ;;
