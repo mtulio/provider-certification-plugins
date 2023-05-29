@@ -37,7 +37,7 @@ FROM golang:1.19-alpine as oelf-builder
 COPY cmd/ocp-etcd-log-filters/*.go $GOPATH/src/github.com/opct/plugins/
 WORKDIR $GOPATH/src/github.com/opct/plugins/
 ADD cmd/ocp-etcd-log-filters/*.go .
-RUN go build -ldflags="-s -w" \
+RUN go mod init && go mod tidy && go build -ldflags="-s -w" \
     -o /usr/bin/ocp-etcd-log-filters *.go
 
 #

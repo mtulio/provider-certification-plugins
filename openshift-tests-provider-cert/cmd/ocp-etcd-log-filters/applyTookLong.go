@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/montanaflynn/stats"
 )
 
 // LogPayloadETCD parses the etcd log file to extract insights
@@ -140,108 +143,156 @@ func (f *FilterApplyTookTooLong) insertBucket(v float64, ts string) {
 	b500ms := group.Bukets500ms
 
 	switch {
-	case v < 200.0:
+	case v < 200:
 		k := "low-200"
-		b1s[k] += 1
-		b500ms[k] += 1
-	case ((v >= 200.0) && (v <= 299.0)):
+		b1s[k] = append(b1s[k], v)
+		b500ms[k] = append(b500ms[k], v)
+
+	case ((v >= 200) && (v < 300)):
 		k := "200-300"
-		b1s[k] += 1
-		b500ms[k] += 1
-	case ((v >= 300.0) && (v <= 399.0)):
+		b1s[k] = append(b1s[k], v)
+		b500ms[k] = append(b500ms[k], v)
+
+	case ((v >= 300) && (v < 400)):
 		k := "300-400"
-		b1s[k] += 1
-		b500ms[k] += 1
-	case ((v >= 400.0) && (v <= 499.0)):
+		b1s[k] = append(b1s[k], v)
+		b500ms[k] = append(b500ms[k], v)
+
+	case ((v >= 400) && (v < 500)):
 		k := "400-500"
-		b1s[k] += 1
-		b500ms[k] += 1
-	case ((v >= 500.0) && (v <= 599.0)):
+
+		b1s[k] = append(b1s[k], v)
+		b500ms[k] = append(b500ms[k], v)
+	case ((v >= 500) && (v < 600)):
 		k := "500-600"
-		b1s[k] += 1
-		k = "500-inf"
-		b500ms[k] += 1
-	case ((v >= 600.0) && (v <= 699.0)):
-		k := "600-700"
-		b1s[k] += 1
-		k = "500-inf"
-		b500ms[k] += 1
-	case ((v >= 700.0) && (v <= 799.0)):
-		k := "700-800"
-		b1s[k] += 1
-		k = "500-inf"
-		b500ms[k] += 1
-	case ((v >= 800.0) && (v <= 899.0)):
-		k := "800-900"
-		b1s[k] += 1
-		k = "500-inf"
-		b500ms[k] += 1
-	case ((v >= 900.0) && (v <= 999.0)):
-		k := "900-1s"
-		b1s[k] += 1
-		k = "500-inf"
-		b500ms[k] += 1
-	case (v >= 1000.0):
-		k := "1s-inf"
-		b1s[k] += 1
+		b1s[k] = append(b1s[k], v)
 
 		k = "500-inf"
-		b500ms[k] += 1
+		b500ms[k] = append(b500ms[k], v)
+
+	case ((v >= 600) && (v < 700)):
+		k := "600-700"
+		b1s[k] = append(b1s[k], v)
+
+		k = "500-inf"
+		b500ms[k] = append(b500ms[k], v)
+	case ((v >= 700) && (v < 800)):
+		k := "700-800"
+		b1s[k] = append(b1s[k], v)
+
+		k = "500-inf"
+		b500ms[k] = append(b500ms[k], v)
+
+	case ((v >= 800) && (v < 900)):
+		k := "800-900"
+		b1s[k] = append(b1s[k], v)
+
+		k = "500-inf"
+		b500ms[k] = append(b500ms[k], v)
+
+	case ((v >= 900) && (v < 1000)):
+		k := "900-1s"
+		b1s[k] = append(b1s[k], v)
+
+		k = "500-inf"
+		b500ms[k] = append(b500ms[k], v)
+
+	case (v >= 1000):
+		k := "1s-inf"
+		b1s[k] = append(b1s[k], v)
+
+		k = "500-inf"
+		b500ms[k] = append(b500ms[k], v)
+
 	default:
 		k := "unkw"
-		b1s[k] += 1
-		b500ms[k] += 1
+		b1s[k] = append(b1s[k], v)
+		b500ms[k] = append(b500ms[k], v)
 	}
 	k := "all"
-
-	b1s[k] += 1
-	b500ms[k] += 1
+	b1s[k] = append(b1s[k], v)
+	b500ms[k] = append(b500ms[k], v)
 }
 
 func (f *FilterApplyTookTooLong) Show() {
 
-	fmt.Printf("> Filter Name: %s\n", f.Name)
+	fmt.Printf("= Filter Name: %s =\n", f.Name)
 
-	fmt.Printf("> Group by: %s\n", f.GroupBy)
-	for aggr, group := range f.Group {
-		if aggr != "all" {
-			fmt.Printf("\n>> %s\n", aggr)
+	fmt.Printf("== Group by: %s ==\n", f.GroupBy)
+	groups := make([]string, 0, len(f.Group))
+	for k := range f.Group {
+		groups = append(groups, k)
+	}
+	sort.Strings(groups)
+	for _, gk := range groups {
+		group := f.Group[gk]
+		if gk != "all" {
+			fmt.Printf("\n== %s ==\n", gk)
 		}
 		b1s := group.Bukets1s
 		b500ms := group.Bukets500ms
 
 		tbWriter := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-		show := func(k string) {
-			v := b1s[k]
-			perc := fmt.Sprintf("(%.3f %%)", (float64(v)/float64(b1s["all"]))*100)
+		getBucketStr := func(k string) string {
+			// v := b1s[k]
+			countB1ms := len(b1s[k])
+			countB1all := len(b1s["all"])
+			perc := fmt.Sprintf("(%.3f %%)", (float64(countB1ms)/float64(countB1all))*100)
 			if k == "all" {
 				perc = ""
 			}
-			fmt.Fprintf(tbWriter, "%s\t %d\t%s\n", k, v, perc)
+			// fmt.Fprintf(tbWriter, "%s\t %d\t%s", k, countB1ms, perc)
+			return fmt.Sprintf("%8.8s %6s %11.10s", k, fmt.Sprintf("%d", countB1ms), perc)
 		}
 
-		fmt.Println(">>> Summary <<<")
-		show("all")
+		fmt.Println("=== Summary ===")
+		fmt.Printf("%s\n", getBucketStr("all"))
 
-		v500 := b500ms["500-inf"]
-		perc500inf := (float64(v500) / float64(b500ms["all"])) * 100
-		fmt.Fprintf(tbWriter, ">500ms\t %d\t(%.3f %%)\n", v500, perc500inf)
+		v500 := len(b500ms["500-inf"])
+		perc500inf := (float64(v500) / float64(len(b500ms["all"]))) * 100
+		fmt.Fprintf(tbWriter, "%8.8s %6s (%.3f %%)\n", ">500ms", fmt.Sprintf("%d", v500), perc500inf)
 		fmt.Fprintf(tbWriter, "---\n")
 
-		fmt.Println(">>> Buckets <<<")
-		show("low-200")
-		show("200-300")
-		show("300-400")
-		show("400-500")
-		show("500-600")
-		show("600-700")
-		show("700-800")
-		show("800-900")
-		show("900-1s")
-		show("1s-inf")
-		show("unkw")
+		fmt.Println("=== Buckets (ms) ===")
+		fmt.Fprintf(tbWriter, "%s | %s | %s\n", getBucketStr("200-300"), getBucketStr("600-700"), getBucketStr("1s-inf"))
+		fmt.Fprintf(tbWriter, "%s | %s | %s\n", getBucketStr("300-400"), getBucketStr("700-800"), getBucketStr("unkw"))
+		fmt.Fprintf(tbWriter, "%s | %s\n", getBucketStr("400-500"), getBucketStr("800-900"))
+		fmt.Fprintf(tbWriter, "%s | %s\n", getBucketStr("500-600"), getBucketStr("900-1s"))
+		fmt.Fprintf(tbWriter, "%s : %v\n", "unkw", b1s["unkw"])
+
+		fmt.Println("=== Timers ===")
+		// https://www.golangprograms.com/golang-statistics-package.html
+		min, _ := stats.Min(b1s["all"])
+		max, _ := stats.Max(b1s["all"])
+		sum, _ := stats.Sum(b1s["all"])
+		median, _ := stats.Median(b1s["all"])
+		p90, _ := stats.Percentile(b1s["all"], 90)
+		p99, _ := stats.Percentile(b1s["all"], 99)
+		p999, _ := stats.Percentile(b1s["all"], 99.9)
+		stddev, _ := stats.StandardDeviationPopulation(b1s["all"])
+		qoutliers, _ := stats.QuartileOutliers(b1s["all"])
+
+		fmt.Fprintf(tbWriter,
+			"%6s \t: %17s\t| %10s \t: %.3f (ms)\n",
+			"Count", fmt.Sprintf("%d", len(b1s["all"])),
+			"P90", p90)
+		fmt.Fprintf(tbWriter,
+			"%6s \t: %12.3f (ms)\t| %10s \t: %f (ms)\n",
+			"Min", min,
+			"P99", p99)
+		fmt.Fprintf(tbWriter,
+			"%6s \t: %12.3f (ms)\t| %10s \t: %.3f (ms)\n",
+			"Max", max,
+			"P99.9", p999)
+		fmt.Fprintf(tbWriter,
+			"%6s \t: %12.3f (ms)\t| %10s \t: %.3f (ms)\n",
+			"Sum", sum,
+			"StdDev", stddev)
+		fmt.Fprintf(tbWriter,
+			"%6s \t: %12.3f (ms)\t| %10s \t: %+v\n",
+			"Median", median,
+			"Outliers", qoutliers)
 
 		tbWriter.Flush()
-
 	}
 }

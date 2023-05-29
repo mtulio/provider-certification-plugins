@@ -27,12 +27,12 @@ func buckets500ms() []string {
 	}
 }
 
-type Buckets map[string]uint64
+type Buckets map[string][]float64
 
 func NewBuckets(values []string) Buckets {
-	buckets := make(map[string]uint64, len(values))
+	buckets := make(Buckets, len(values))
 	for _, v := range values {
-		buckets[v] = 0
+		buckets[v] = []float64{}
 	}
 	return buckets
 }
