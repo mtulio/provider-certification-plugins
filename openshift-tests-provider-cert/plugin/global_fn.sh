@@ -5,7 +5,7 @@
 # os_log_info logger function, printing the current bash script
 # and line as prefix.
 os_log_info() {
-    echo "$(date +%Y-%m-%d_%H:%M:%S) | [${SERVICE_NAME}] | $(caller | awk '{print$2":"$1}')> " "$@"
+    echo "$(date --iso-8601=seconds) | [${SERVICE_NAME}] | $(caller | awk '{print$2":"$1}')> " "$@"
 }
 export -f os_log_info
 

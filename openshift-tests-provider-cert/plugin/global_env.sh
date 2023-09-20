@@ -54,12 +54,12 @@ declare -grx OPENSHIFT_TESTS_SUITE_UPGRADE="none"
 ## openshift-kube-conformance
 declare -grx PLUGIN_ID_KUBE_CONFORMANCE="10"
 declare -grx PLUGIN_NAME_KUBE_CONFORMANCE="${PLUGIN_ID_KUBE_CONFORMANCE}-openshift-kube-conformance"
-declare -grx OPENSHIFT_TESTS_SUITE_KUBE_CONFORMANCE="kubernetes/conformance"
+declare -grx OPENSHIFT_TESTS_SUITE_KUBE_CONFORMANCE="${PLUGIN_SUITE_KUBE_CONFORMANCE:-kubernetes/conformance}"
 
 ## openshift-conformance-validated
 declare -grx PLUGIN_ID_OPENSHIFT_CONFORMANCE="20"
 declare -grx PLUGIN_NAME_OPENSHIFT_CONFORMANCE="${PLUGIN_ID_OPENSHIFT_CONFORMANCE}-openshift-conformance-validated"
-declare -grx OPENSHIFT_TESTS_SUITE_OPENSHIFT_CONFORMANCE="openshift/conformance"
+declare -grx OPENSHIFT_TESTS_SUITE_OPENSHIFT_CONFORMANCE="${PLUGIN_SUITE_OPENSHIFT_CONFORMANCE:-openshift/conformance}"
 
 ## openshift-artifacts-collector
 declare -grx PLUGIN_ID_OPENSHIFT_ARTIFACTS_COLLECTOR="99"

@@ -6,7 +6,7 @@ set -o nounset
 # set -o errexit
 
 os_log_info_local() {
-    os_log_info "$(date +%Y%m%d-%H%M%S)> [waiter] $*"
+    os_log_info "[waiter] $*"
 }
 
 os_log_info_local "Starting Level[${PLUGIN_ID:-}]..."
@@ -19,8 +19,9 @@ if [[ ${#PLUGIN_BLOCKED_BY[@]} -ge 1 ]]; then
         os_log_info_local "Waiting for pod running with label: ${pod_label}"
         kubectl wait \
             --namespace "${ENV_POD_NAMESPACE:-sonobuoy}" \
-            --timeout=10m \
+            --timeout=3m \
             --for=condition=ready pod \
+            --field-selector=status.phase!=Succeeded \
             -l sonobuoy-plugin="${pod_label}"
     done
 
@@ -43,7 +44,7 @@ if [[ ${#PLUGIN_BLOCKED_BY[@]} -ge 1 ]]; then
             plugin_status=$(jq -r ".plugins[] | select (.plugin == \"${bl_plugin_name}\" ) |.status // \"\"" "${STATUS_FILE}")
 
             os_log_info_local "Plugin[${bl_plugin_name}] with status[${plugin_status}]..."
-            os_log_info_local "$(cat "${STATUS_FILE}")"
+            #os_log_info_local "$(cat "${STATUS_FILE}")"
             if [[ "${plugin_status}" == "${SONOBUOY_PLUGIN_STATUS_COMPLETE}" ]] || [[ "${plugin_status}" == "${SONOBUOY_PLUGIN_STATUS_FAILED}" ]]; then
                 os_log_info_local "Plugin[${bl_plugin_name}] with status[${plugin_status}] is completed!"
                 break
