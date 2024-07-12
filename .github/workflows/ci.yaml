@@ -1,7 +1,6 @@
 ---
 name: release-tag
 on: 
-  pull_request:
   push:
     tags:
       - 'v*.*.*'
@@ -36,7 +35,9 @@ jobs:
     needs: [linters]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
       - name: Set vars
         id: vars
@@ -47,10 +48,13 @@ jobs:
           RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
           QUAY_USER: ${{ secrets.QUAY_USER }}
           QUAY_PASS: ${{ secrets.QUAY_PASS }}
+          EXPIRE: never
         run: |
           podman login -u="${QUAY_USER}" -p="${QUAY_PASS}" quay.io
-          cd openshift-tests-provider-cert/;
-          make release VERSION=$RELEASE_VERSION
+          echo "> Build and publish container image:"
+          make build-arch-amd64 VERSION=${VERSION}
+          make build-arch-arm64 VERSION=${VERSION}
+          make push-manifests VERSION=${VERSION}
 
       # https://github.com/mikepenz/release-changelog-builder-action#configuration
       - name: Build Changelog

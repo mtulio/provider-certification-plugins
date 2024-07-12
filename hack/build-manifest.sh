@@ -34,13 +34,17 @@ do
 done
 
 set -x
+
 if podman manifest exists "${base_image}" ; then
     echo "Manifest already exists: ${base_image}"
-else
-    echo "Creating manifest for [${base_image}] with iamges [${PLATFORM_IMAGES}]"
-    # shellcheck disable=SC2086
-    podman manifest create "${base_image}" ${PLATFORM_IMAGES}
+    echo "Removing existing manifest: ${base_image}"
+    podman manifest rm "${base_image}"
 fi
+
+echo "Creating manifest for [${base_image}] with iamges [${PLATFORM_IMAGES}]"
+# shellcheck disable=SC2086
+podman manifest create "${base_image}" ${PLATFORM_IMAGES}
+
 
 if [[ "${COMMAND}" == "push" ]] ; then
     echo "Pushing manifest: ${base_image}"

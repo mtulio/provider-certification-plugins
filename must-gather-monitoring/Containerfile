@@ -15,8 +15,7 @@ LABEL io.k8s.display-name="OPCT Must-Gather Monitoring" \
       os=$TARGETOS
 
 # For gathering data from nodes
-RUN microdnf update -y && \
-    microdnf install util-linux rsync -y && \
+RUN microdnf install util-linux rsync -y && \
     microdnf clean all
 
 COPY ./VERSION .

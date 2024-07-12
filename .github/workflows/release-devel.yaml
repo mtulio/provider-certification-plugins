@@ -29,9 +29,9 @@ jobs:
 #
 # Build container image
 #
-  build-container:
-    name: release container(devel)
-    runs-on: ubuntu-22.04
+  build-amd64:
+    name: build container amd64
+    runs-on: macos-latest
     needs: [linters]
     env:
       VERSION: "v0.0.0-devel-pr.${{ github.event.pull_request.number }}"
@@ -46,87 +46,62 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build images x86_64
+      - name: Build images AMD64
         shell: bash
         run: |
           echo "> Build and publish container image:"
           make build-arch-amd64 VERSION=${VERSION}
 
-      # # TODO1: arm64 environment on Github Actions is not working.
-      # # manual steps is required:
-      # # $ make build-arch-arm64 VERSION=${VERSION}
-      # # $ make push-manifests VERSION=${VERSION}
-      #
-      # # TODO2: Quay login is not working for newer steps. Secrets are returning empty values.
-      #
-      # image is not working with podman
-      # - uses: uraimo/run-on-arch-action@v2
-      #   name: Build images arm64
-      #   id: build
-      #   with:
-      #     arch: aarch64
-      #     distro: ubuntu20.04
-      #     shell: /bin/bash
-      #     env: |
-      #       VERSION: "v0.0.0-devel-pr.${{ github.event.pull_request.number }}"
-      #       TOOLS_REPO: localhost/tools
-      #       PLUGIN_TESTS_REPO: localhost/plugin-openshift-tests
-      #       MGM_REPO: localhost/must-gather-monitoring
-      #     run: |
-      #       apt-get update \
-      #         && apt -y install build-essential lsb-release curl gpg
-      #       # https://podman.io/docs/installation
-      #       mkdir -p /etc/apt/keyrings
-      #       curl -fsSL "https://download.opensuse.org/repositories/devel:kubic:libcontainers:unstable/xUbuntu_$(lsb_release -rs)/Release.key" \
-      #         | gpg --dearmor \
-      #         | tee /etc/apt/keyrings/devel_kubic_libcontainers_unstable.gpg > /dev/null
-      #       echo \
-      #         "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/devel_kubic_libcontainers_unstable.gpg]\
-      #           https://download.opensuse.org/repositories/devel:kubic:libcontainers:unstable/xUbuntu_$(lsb_release -rs)/ /" \
-      #         | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:unstable.list > /dev/null
-      #       #apt-get update -qq
-      #       apt-get -qq -y install podman
+  build-arm64:
+    name: build container arm64
+    runs-on: ubuntu-latest
+    needs: [linters]
+    env:
+      VERSION: "v0.0.0-devel-pr.${{ github.event.pull_request.number }}"
+      TOOLS_REPO: localhost/tools
+      PLUGIN_TESTS_REPO: localhost/plugin-openshift-tests
+      MGM_REPO: localhost/must-gather-monitoring
 
-      #       echo "> Build and publish container image:"
-      #       make build-arch-arm64 VERSION=${VERSION}
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-      # - name: Build manifests
-      #   shell: bash
-      #   run: |
-      #     echo "> Build and publish container image:"
-      #     make build-manifests VERSION=${VERSION}
+      - name: Build images ARM64
+        shell: bash
+        run: |
+          echo "> Build and publish container image:"
+          make build-arch-arm64 VERSION=${VERSION}
 
-      # # https://github.com/marketplace/actions/podman-login
-      # - name: Log in to Quay.io
-      #   uses: redhat-actions/podman-login@v1
-      #   with:
-      #     username: ${{ env.PROD_QUAY_USER }}
-      #     password: ${{ env.PROD_QUAY_PASS }}
-      #     registry: quay.io
+#
+# Releasing: triggered when a tag is created
+#
+  release:
+    if: startsWith(github.ref, 'refs/head/main')
+    runs-on: ubuntu-latest
+    needs:
+      - build-amd64
+      - build-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-      # - name: Push images
-      #   shell: bash
-      #   run: |
-      #     echo "> PuBuild and publish manifests"
-      #     make push-manifests VERSION=${VERSION}
-
-      # # Commenting in PR
-      # - name: Find comment
-      #   uses: peter-evans/find-comment@v2
-      #   id: fbc
-      #   with:
-      #     issue-number: ${{ github.event.pull_request.number }}
-      #     comment-author: 'github-actions[bot]'
-      #     body-includes: '<!-- id-build-comment -->'
-      # - name: Create comment
-      #   # if: steps.fbc.outputs.comment-id == ''
-      #   uses: peter-evans/create-or-update-comment@v3
-      #   with:
-      #     issue-number: ${{ github.event.pull_request.number }}
-      #     body: |
-      #       <!-- id-build-comment -->
-      #       Images built:
-      #       - Tools: [quay.io/opct/tools:${{ env.VERSION }}](https://quay.io/repository/opct/tools?tab=tags)
-      #       - Plugin openshift-tests: [quay.io/opct/plugin-openshift-tests:${{ env.VERSION }}](https://quay.io/repository/opct/plugin-openshift-tests?tab=tags)
-      #       - Must-Gather Monitoring: [quay.io/opct/must-gather-monitoring:${{ env.VERSION }}](https://quay.io/repository/opct/must-gather-monitoring?tab=tags)
-      #     reactions: rocket
+      - name: Build and push container images
+        env:
+          QUAY_USER: ${{ secrets.QUAY_USER }}
+          QUAY_PASS: ${{ secrets.QUAY_PASS }}
+          EXPIRE: never
+          VERSION: latest
+          TOOLS_REPO: localhost/tools
+          PLUGIN_TESTS_REPO: localhost/plugin-openshift-tests
+          MGM_REPO: localhost/must-gather-monitoring
+        run: |
+          podman login -u="${QUAY_USER}" -p="${QUAY_PASS}" quay.io
+          echo "> Build and publish container image:"
+          make build-arch-amd64 VERSION=${VERSION}
+          make build-arch-arm64 VERSION=${VERSION}
+          make push-manifests VERSION=${VERSION}
