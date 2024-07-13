@@ -44,17 +44,16 @@ jobs:
         run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
 
       - name: Push Container image
+        shell: bash
         env:
-          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+          VERSION: ${{ steps.vars.outputs.tag }}
           QUAY_USER: ${{ secrets.QUAY_USER }}
           QUAY_PASS: ${{ secrets.QUAY_PASS }}
           EXPIRE: never
         run: |
           podman login -u="${QUAY_USER}" -p="${QUAY_PASS}" quay.io
           echo "> Build and publish container image:"
-          make build-arch-amd64 VERSION=${VERSION}
-          make build-arch-arm64 VERSION=${VERSION}
-          make push-manifests VERSION=${VERSION}
+          make images VERSION=${VERSION} PLATFORMS="${PLATFORMS}" COMMAND=push
 
       # https://github.com/mikepenz/release-changelog-builder-action#configuration
       - name: Build Changelog

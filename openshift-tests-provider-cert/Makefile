@@ -13,14 +13,16 @@ build-dev:
 	VERSION_DEVEL=devel REGISTRY_PLUGIN=$(DEV_REGISTRY) hack/build-image.sh build-dev
 .PHONY: build-dev
 
+.PHONY: release
 release:
 	VERSION_PLUGIN=$(VERSION) hack/build-image.sh release
-.PHONY: release
 
+
+.PHONY: test
 test:
 	hack/test_runner.sh
-.PHONY: test
 
+.PHONY: test-shellcheck
 test-shellcheck:
 	shellcheck plugin/*.sh hack/*.sh
-.PHONY: test-shellcheck
+
