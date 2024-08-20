@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+# This script is used to run the OCI e2e tests.
+GINKGO_FOCUS=${GINKGO_FOCUS:-"\[cloud-provider-aws-e2e\]"}
+GINKGO_SKIP=${GINKGO_SKIP:-"\[Disruptive\]"}
+GINKGO_NODES=${GINKGO_NODES:-4}
+ARTIFACTS=/tmp/shared/artifacts
+
+# setup the environment
+function setup() {
+    export PATH=$PATH:/tmp/bin
+    export PATH=$PATH:/usr/local/go/bin
+    export PATH=$PATH:${HOME}/bin
+    mkdir -p /tmp/bin
+    
+    # Setup kubectl
+    ln -svf /usr/bin/oc /tmp/bin/kubectl
+    kubectl version --client
+    
+    # Clone the repo
+    git clone --depth 1 --branch "${VERSION}" "${REPOSITORY_URL}"  "${WORKDIR}"/e2e && cd "${WORKDIR}"/e2e
+
+    # Install ginkgo
+    # https://onsi.github.io/ginkgo/
+    #export GOROOT="${WORKDIR}"/e2e
+    #go install github.com/onsi/ginkgo/v2/ginkgo@latest
+    #go get -u github.com/onsi/ginkgo/ginkgo && ln -svf "$(go env GOPATH)/bin/ginkgo" /tmp/bin/ginkgo
+    #ginkgo version
+    make e2e.test
+}
+export -f setup
+
+function load_env() {
+    # TODO:
+    # extract the required env vars from the secret in external namespace added in the var ENV_SECRET, extracting to /tmp/env
+    touch /tmp/env
+    #oc extract secrets/mysecret -n myproject --to=/tmp/env
+
+    # TODO define CLOUD_CONFIG: copy from CCM
+
+    #export CLUSTER_KUBECONFIG=$KUBECONFIG
+    #export CLOUD_CONFIG=/tmp/env
+    #source "${WORKDIR}"/e2e/hack/existing-standalone-cluster-env-template.sh
+
+    return
+}
+
+# run the tests
+# https://github.com/oracle/oci-cloud-controller-manager/blob/master/test/e2e/cloud-provider-oci/README.md
+function start_e2e() {
+    # Run the e2e tests
+    cd ${WORKDIR}
+
+    # load required env vars
+    load_env
+
+    # from https://github.com/kubernetes/cloud-provider-aws/blob/master/hack/e2e/run.sh
+    set -x
+    pushd ./tests/e2e
+    ginkgo . -v -p --nodes="${GINKGO_NODES}" --focus="${GINKGO_FOCUS}" --skip="${GINKGO_SKIP}" --report-dir="${ARTIFACTS}"
+    popd
+}

@@ -1,0 +1,63 @@
+---
+podSpec:
+  restartPolicy: Never
+  serviceAccountName: sonobuoy-serviceaccount
+  priorityClassName: system-node-critical
+  volumes:
+    - name: shared
+      emptyDir: {}
+  initContainers:
+    - name: login
+      image: "{{ .OpenshiftTestsImage }}"
+      imagePullPolicy: Always
+      command:
+        - "/bin/bash"
+        - "-c"
+        - |
+          /usr/bin/oc login "${KUBE_API_URL}" \
+            --token="$(cat "${SA_TOKEN_PATH}")" \
+            --certificate-authority="${SA_CA_PATH}";
+      env:
+        - name: KUBECONFIG
+          value: "/tmp/shared/kubeconfig"
+        - name: KUBE_API_URL
+          value: "https://kubernetes.default.svc:443"
+        - name: SA_TOKEN_PATH
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        - name: SA_CA_PATH
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+      volumeMounts:
+        - mountPath: /tmp/shared
+          name: shared
+sonobuoy-config:
+  driver: Job
+  plugin-name: platform-external-ccm
+  result-format: junit
+  source_url: https://raw.githubusercontent.com/redhat-ecosystem/provider-certification-plugins/main/platform-external
+  description: A quickly way to execut e2e tests on a Provider.
+spec:
+  name: plugin
+  image: quay.io/opct/platform-external:v0.1.0
+  imagePullPolicy: Always
+  command:
+  - bash
+  -  /usr/bin/platform-external-e2e
+  env:
+  - name: PROVIDER_NAME
+    value: oci
+  - name: REPOSITORY_URL
+    value: https://github.com/oracle/oci-cloud-controller-manager.git
+  - name: VERSION
+    value: v1.29.0
+  - name: ENV_SECRET
+    value: e2e-oci/oci-secret
+  - name: KUBECONFIG
+    value: "/tmp/shared/kubeconfig"
+  - name: WORKDIR
+    value: "/tmp/shared"
+  resources: {}
+  volumeMounts:
+    - mountPath: /tmp/sonobuoy/results
+      name: results
+    - mountPath: /tmp/shared
+      name: shared

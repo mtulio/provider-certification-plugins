@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+# This script is used to run the OCI e2e tests.
+# trap errors
+trap 'echo "An error occurred in OCI e2e tests." >&2' ERR
+
+# setup the environment
+source /usr/bin/platform-external-"${PROVIDER_NAME}"
+setup
+
+# run the tests
+start_e2e

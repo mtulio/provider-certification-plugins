@@ -1,0 +1,29 @@
+
+#
+## Base image for must-gather-monitoring plugin
+#
+FROM quay.io/opct/tools:v0.4.0 AS tools
+
+#FROM docker.io/golang:1.22-alpine AS go
+
+FROM quay.io/fedora/fedora-minimal:40
+ARG QUAY_EXPIRATION=never
+LABEL io.k8s.display-name="OPCT Plugin Platform External" \
+      quay.expires-after=${QUAY_EXPIRATION}
+
+WORKDIR /plugin
+ADD https://go.dev/dl/go1.23.0.linux-amd64.tar.gz /tmp/go.tar.gz
+
+RUN echo "fastestmirror=true" >> /etc/dnf/dnf.conf \
+    && microdnf install -y git tar make \
+    && microdnf clean all && rm -rf /var/cache/dnf \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz
+
+COPY --from=tools /usr/bin/oc /usr/bin/oc
+COPY --from=tools /usr/bin/jq /usr/bin/jq
+
+# Copy all providers scripts to /usr/bin
+COPY ./platform-external /usr/bin/
+COPY providers/* /usr/bin/
+
+CMD ["/usr/bin/platform-external"]
