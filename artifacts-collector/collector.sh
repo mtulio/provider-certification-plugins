@@ -146,6 +146,53 @@ collect_metrics() {
     os_log_info "${msg_prefix} finished!"
 }
 
+# kube_burner run workloads for performance and scale testing. The tests are
+# executed in the Validation environment, and the results are saved as raw data
+# into the artifact path.
+# https://kube-burner.github.io/kube-burner-ocp/latest/
+
+function kube_burner_install() {
+    if [[  -f /usr/local/bin/kube-burner-ocp ]]; then
+        return
+    fi
+    send_test_progress "status=running=kube-burner=install";
+    KBWO_VERSION="1.3.1"
+    ARCH=$(uname -m)
+    echo "Installing kube-burner-ocp version ${KBWO_VERSION} for ${ARCH}"
+    wget -q -O kube-burner-ocp.tar.gz "https://github.com/kube-burner/kube-burner-ocp/releases/download/v${KBWO_VERSION}/kube-burner-ocp-V${KBWO_VERSION}-linux-${ARCH}.tar.gz"
+    tar xfz kube-burner-ocp.tar.gz && mv -v kube-burner-ocp /usr/local/bin/kube-burner-ocp
+}
+
+function kube_burner_run() {
+    local index_dir
+    local index_name
+    echo "> Running kube-burner ${KB_CMD}"
+    kube_burner_install
+    send_test_progress "status=running=kube-burner=${KB_CMD}";
+    kube-burner-ocp ${KB_CMD} --local-indexing ${KUBE_BURNER_EXTRA_ARGS-} |& tee -a "${RESULTS_DIR}"/artifacts_kube-burner-"${KB_CMD}".txt
+    index_dir=$(ls collected-metrics* -d)
+    index_name=${KB_CMD}-${index_dir}
+    mv -v "${index_dir}" "${index_name}"
+    tar cvfz "${RESULTS_DIR}"/artifacts_kube-burner-"${index_name}".tar.gz "${index_name}"
+}
+
+function collect_kube_burner() {
+    for KB_CMD in ${KUBE_BURNER_COMMANDS-}; do
+    echo "> Running kube-burner command: ${KB_CMD}"
+    unset KUBE_BURNER_EXTRA_ARGS
+    case ${KB_CMD} in
+        "cluster-density-v2")
+            KUBE_BURNER_EXTRA_ARGS="--iterations=1 --churn-duration=2m0s --churn-cycles=2"
+            kube_burner_run;
+            ;;
+        *)
+            kube_burner_run;
+            ;;
+    esac
+    send_test_progress "status=done=kube-burner";
+done
+}
+
 # Run Plugin for Collecor. The Collector plugin is the last one executed on the
 # cluster. It will collect custom files used on the Validation environment, at the
 # end it will generate a tarbal file to submit the raw results to Sonobuoy.
@@ -155,21 +202,32 @@ run_plugin_collector() {
     pushd "${RESULTS_DIR}" || true
 
     # Collecting must-gather
-    send_test_progress "status=running=collecting must-gather";
-    collect_must_gather || true
+    if [[ "${SKIP_MUST_GATHER:-false}" == "false" ]]; then
+        send_test_progress "status=running=collecting must-gather";
+        collect_must_gather || true
+    fi
 
     # Experimental: Collect performance data
     # running after must-gather to prevent impacting in etcd logs when testing etcdfio.
-    send_test_progress "status=running=collecting performance data";
-    collect_performance || true
+    if [[ "${SKIP_PERFORMANCE:-false}" == "false" ]]; then
+        send_test_progress "status=running=collecting performance data";
+        collect_performance || true
+    fi
 
     # Experimental: Collect metrics
-    send_test_progress "status=running=collecting metrics";
-    collect_metrics || true
+    if [[ "${SKIP_METRICS:-false}" == "false" ]]; then
+        send_test_progress "status=running=collecting metrics";
+        collect_metrics || true
+    fi
+
+    # Experimental: Collect metrics
+    if [[ "${SKIP_KUBE_BURNER:-false}" == "false" ]]; then
+        send_test_progress "status=running=kube-burner";
+        collect_kube_burner || true
+    fi
 
     # Creating Result file used to publish to sonobuoy. (last step)
     send_test_progress "status=running=saving artifacts";
-
     os_log_info "[executor][PluginID#${PLUGIN_ID}] Packing all results..."
     ls -sh ./artifacts_*
     tar cfz raw-results.tar.gz ./artifacts_*

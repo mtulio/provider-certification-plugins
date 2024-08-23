@@ -18,7 +18,8 @@ LABEL io.k8s.display-name="OPCT Clients" \
 WORKDIR /plugin
 
 RUN echo "fastestmirror=true" >> /etc/dnf/dnf.conf \
-    && microdnf install -y curl grep tar xz gzip diff \
+    && microdnf update -y \
+    && microdnf install -y wget curl grep tar xz gzip diff \
     && microdnf clean all
 
 COPY --from=tools /usr/bin/oc /usr/bin/oc
