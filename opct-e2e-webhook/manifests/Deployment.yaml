@@ -1,0 +1,28 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opct-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opct-webhook
+  template:
+    metadata:
+      labels:
+        app: opct-webhook
+    spec:
+      containers:
+      - name: webhook
+        image: TODO:docker-image
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /path/to/tls
+          readOnly: true
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: webhook-certs
