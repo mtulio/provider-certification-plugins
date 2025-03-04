@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 
@@ -18,17 +19,21 @@ import (
 )
 
 func main() {
+	tlsCert := flag.String("tls-cert", "/var/run/app/certs/tls.crt", "Path to the TLS certificate file")
+	tlsKey := flag.String("tls-key", "/var/run/app/certs/tls.key", "Path to the TLS key file")
+	flag.Parse()
+
 	http.HandleFunc("/mutate", handleMutate)
 	server := &http.Server{
 		Addr:      ":8443",
-		TLSConfig: configTLS(),
+		TLSConfig: configTLS(tlsKey, tlsCert),
 	}
 	fmt.Println("Starting server on :8443")
-	server.ListenAndServeTLS("/path/to/tls.crt", "/path/to/tls.key")
+	server.ListenAndServeTLS(*tlsCert, *tlsKey)
 }
 
 func handleMutate(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "could not read request body", http.StatusBadRequest)
 		return
@@ -126,8 +131,8 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseBytes)
 }
 
-func configTLS() *tls.Config {
-	cert, err := tls.LoadX509KeyPair("/path/to/tls.crt", "/path/to/tls.key")
+func configTLS(tlsKey *string, tlsCert *string) *tls.Config {
+	cert, err := tls.LoadX509KeyPair(*tlsCert, *tlsKey)
 	if err != nil {
 		fmt.Printf("Failed to load key pair: %v\n", err)
 		os.Exit(1)

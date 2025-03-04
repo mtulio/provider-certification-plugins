@@ -1,0 +1,25 @@
+#
+# Go Builder image: openshift-tests-plugin CLI
+#
+FROM docker.io/golang:1.23-alpine AS gobuilder
+ARG BUILD_VERSION
+WORKDIR /go/src/github.com/redhat-openshift-ecosystem/provider-certification-plugins/opct-e2e-webhook
+RUN apk add --no-cache --update make git binutils
+COPY . .
+RUN make build RELEASE_TAG=${BUILD_VERSION} && mv ./bin/opct-e2e-webhook /opct-e2e-webhook
+
+#
+# Plugin image
+#
+FROM quay.io/fedora/fedora-minimal:41
+ARG QUAY_EXPIRATION=never
+LABEL io.k8s.display-name="opct-e2e-webhook" \
+      io.k8s.description="OPCT e2e webhook to mutate tests to allow scheduling in dedicated node." \
+      io.openshift.tags="opct,e2e,webhook" \
+      quay.expires-after=${QUAY_EXPIRATION}
+
+WORKDIR /webhook
+COPY --from=gobuilder /opct-e2e-webhook /usr/bin/opct-e2e-webhook
+COPY manifests/* .
+
+CMD ["/bin/sh", "-c", "/usr/bin/opct-e2e-webhook"]

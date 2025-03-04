@@ -2,27 +2,86 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: opct-webhook
+  name: opct-e2e-webhook
+  namespace: opct
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: opct-webhook
+      app: opct-e2e-webhook
   template:
     metadata:
       labels:
-        app: opct-webhook
+        app: opct-e2e-webhook
     spec:
       containers:
       - name: webhook
-        image: TODO:docker-image
+        command:
+        - /usr/bin/opct-e2e-webhook
+        - --tls-cert=/var/run/app/certs/tls.crt
+        - --tls-key=/var/run/app/certs/tls.key
+        - --namespace=opct
+        - --port=9443
+        - --service-name=pod-identity-webhook
+        image: quay.io/opct/plugin-opct-e2e-webhook:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8443
-        volumeMounts:
-        - name: webhook-certs
-          mountPath: /path/to/tls
+        # volumeMounts:
+        # - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        #   name: kube-api-access
           readOnly: true
+        volumeMounts:
+        - mountPath: /var/run/app/certs
+          name: webhook-certs
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      priorityClassName: system-cluster-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      nodeSelector:
+        node-role.kubernetes.io/tests: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/tests"
+        operator: "Exists"
+        effect: "NoSchedule"
       volumes:
       - name: webhook-certs
         secret:
-          secretName: webhook-certs
+          defaultMode: 420
+          secretName: pod-identity-webhook
+      # - name: kube-api-access
+      #   projected:
+      #     defaultMode: 420
+      #     sources:
+      #     - serviceAccountToken:
+      #         expirationSeconds: 3607
+      #         path: token
+      #     - configMap:
+      #         items:
+      #         - key: ca.crt
+      #           path: ca.crt
+      #         name: kube-root-ca.crt
+      #     - downwardAPI:
+      #         items:
+      #         - fieldRef:
+      #             apiVersion: v1
+      #             fieldPath: metadata.namespace
+      #           path: namespace
+      #     - configMap:
+      #         items:
+      #         - key: service-ca.crt
+      #           path: service-ca.crt
+      #         name: openshift-service-ca.crt
