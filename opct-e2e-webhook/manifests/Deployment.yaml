@@ -14,16 +14,15 @@ spec:
       labels:
         app: opct-e2e-webhook
     spec:
+      serviceAccountName: opct-e2e-webhook
       containers:
       - name: webhook
         command:
         - /usr/bin/opct-e2e-webhook
         - --tls-cert=/var/run/app/certs/tls.crt
         - --tls-key=/var/run/app/certs/tls.key
-        - --namespace=opct
-        - --port=9443
-        - --service-name=pod-identity-webhook
-        image: quay.io/opct/plugin-opct-e2e-webhook:latest
+        - --tls-cert-ca=/var/run/app/cacerts/service-ca.crt
+        image: quay.io/mrbraga/opct-e2e-webhook:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8443
@@ -34,6 +33,8 @@ spec:
         volumeMounts:
         - mountPath: /var/run/app/certs
           name: webhook-certs
+        - mountPath: /var/run/app/cacerts
+          name: webhook-cacerts
         resources:
           requests:
             cpu: 10m
@@ -61,7 +62,11 @@ spec:
       - name: webhook-certs
         secret:
           defaultMode: 420
-          secretName: pod-identity-webhook
+          secretName: opct-e2e-webhook
+      - name: webhook-cacerts
+        configMap:
+          defaultMode: 420
+          name: opct-e2e-webhook
       # - name: kube-api-access
       #   projected:
       #     defaultMode: 420

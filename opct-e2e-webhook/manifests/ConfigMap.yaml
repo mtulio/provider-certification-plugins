@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opct-e2e-webhook
+  namespace: opct
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+dataData:
+  stat: "true"

@@ -1,16 +1,16 @@
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: opct-webhook
+  name: opct-e2e-webhook
+  namesmapce: opct
 webhooks:
-- name: opct-webhook.opct.svc
+- name: opct-e2e-webhook.opct.svc
   clientConfig:
     service:
-      name: opct-webhook
+      name: opct-e2e-webhook
       namespace: opct
       path: "/mutate"
-    caBundle: <base64-encoded-ca-cert>
+    caBundle: {{ .CertCA }}
   rules:
   - operations: ["CREATE"]
     apiGroups: [""]
